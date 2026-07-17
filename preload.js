@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld('api', {
   saveCredentials: (clientId, clientSecret) =>
     ipcRenderer.invoke('config:saveCredentials', { clientId, clientSecret }),
   setInterval: (sec) => ipcRenderer.invoke('config:setInterval', sec),
+  setBgMusicUrl: (url) => ipcRenderer.invoke('config:setBgMusicUrl', url),
   resetAuth: () => ipcRenderer.invoke('app:reset'),
 
   startBrowserLogin: () => ipcRenderer.invoke('auth:startBrowserLogin'),
@@ -21,4 +22,10 @@ contextBridge.exposeInMainWorld('api', {
   openExternal: (url) => ipcRenderer.invoke('shell:openExternal', url),
   setFullscreen: (on) => ipcRenderer.invoke('window:setFullscreen', on),
   copyPhoto: (fileUrl) => ipcRenderer.invoke('photos:copyToClipboard', fileUrl),
+
+  musicLoad: (url, videoId) => ipcRenderer.invoke('music:load', { url, videoId }),
+  musicToggle: () => ipcRenderer.invoke('music:toggle'),
+  musicVolume: (vol) => ipcRenderer.invoke('music:volume', vol),
+
+  closeAndClear: () => ipcRenderer.invoke('app:closeAndClear'),
 });

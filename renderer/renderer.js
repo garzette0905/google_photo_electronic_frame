@@ -28,7 +28,23 @@ async function loadBranding() {
     `linear-gradient(rgba(11,18,32,0.72), rgba(11,18,32,0.88)), url("${b.imageUrl}")`;
   document.getElementById('brand-title').textContent = b.title;
   document.getElementById('brand-name').textContent = b.appName;
+  document.getElementById('splash-img').src = b.imageUrl;
   return b;
+}
+
+// 밝은 브랜딩 이미지로 화면을 덮고 reveal()로 그 아래 화면을 준비시킨 뒤,
+// holdMs만큼 대기했다가 서서히 사라지며 준비된 화면을 드러낸다.
+// 화면 전환(사진 다시 선택하기 / 계정 다시 연결 / 사진 열기 등)마다 재사용된다.
+function withSplash(reveal, holdMs = 5000) {
+  const splash = document.getElementById('splash');
+  splash.style.transition = 'none';
+  splash.classList.remove('fade-out');
+  void splash.offsetHeight; // reflow: transition:none을 확실히 적용시킨 뒤 복원
+  splash.style.transition = '';
+
+  reveal();
+
+  setTimeout(() => splash.classList.add('fade-out'), holdMs);
 }
 
 // ---------------- Screen 1: credentials ----------------
@@ -54,10 +70,12 @@ document.getElementById('btn-open-console').addEventListener('click', () => {
 // ---------------- Screen 2: browser login ----------------
 
 function startAuthFlow() {
-  showOnboarding('auth');
-  document.getElementById('auth-error').classList.add('hidden');
-  document.getElementById('auth-status').classList.add('hidden');
-  document.getElementById('btn-start-login').classList.remove('hidden');
+  withSplash(() => {
+    showOnboarding('auth');
+    document.getElementById('auth-error').classList.add('hidden');
+    document.getElementById('auth-status').classList.add('hidden');
+    document.getElementById('btn-start-login').classList.remove('hidden');
+  });
 }
 
 document.getElementById('btn-start-login').addEventListener('click', async () => {
@@ -82,7 +100,11 @@ document.getElementById('btn-start-login').addEventListener('click', async () =>
 
 // ---------------- Screen 3: picker (photo selection) ----------------
 
-async function startPickerFlow() {
+function startPickerFlow() {
+  withSplash(() => { runPickerFlow(); });
+}
+
+async function runPickerFlow() {
   showOnboarding('source');
   const qrEl = document.getElementById('source-qr');
   const statusEl = document.getElementById('source-status');
@@ -104,7 +126,7 @@ async function startPickerFlow() {
       e.preventDefault();
       window.api.openExternal(result.pickerUri);
     };
-    statusEl.textContent = '선택 화면에서 사진을 고르는 중...';
+    statusEl.textContent = '';
   } catch (err) {
     statusEl.textContent = '';
     errEl.textContent = err.message.includes('SCOPE')
@@ -241,7 +263,33 @@ async function showCurrent() {
   const { main, sub } = formatDate(photo.createTime);
   document.getElementById('cur-date-main').textContent = main;
   document.getElementById('cur-date-sub').textContent = sub;
+  updateFullscreenCaption(photo);
   updateActiveThumb();
+}
+
+function updateFullscreenCaption(photo) {
+  const el = document.getElementById('fullscreen-caption');
+  const d = new Date(photo.createTime);
+  const dateStr = new Intl.DateTimeFormat('ko-KR', {
+    year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(d);
+  const timeStr = new Intl.DateTimeFormat('ko-KR', { hour: '2-digit', minute: '2-digit' }).format(d);
+
+  const lines = [`${dateStr} ${timeStr}`];
+  // photo.place는 Google Photos API가 위치 정보를 제공하지 않아 항상 비어있지만,
+  // 나중에 다른 소스로 채워질 경우를 대비해 있으면만 표시하도록 남겨둔다.
+  if (photo.place) lines.push(photo.place);
+  if (musicPlaying && musicTitle) lines.push(`♪ ${musicTitle}`);
+  el.textContent = '';
+  lines.forEach((line, i) => {
+    if (i > 0) el.appendChild(document.createElement('br'));
+    el.appendChild(document.createTextNode(line));
+  });
+}
+
+function refreshCaption() {
+  const photo = filteredPhotos[currentIndex];
+  if (photo) updateFullscreenCaption(photo);
 }
 
 function advance() {
@@ -250,11 +298,30 @@ function advance() {
   showCurrent();
 }
 
+let slideshowPaused = false;
+
 function resetTimer(intervalSec) {
   if (intervalHandle) clearInterval(intervalHandle);
+  if (slideshowPaused) return; // 잠시멈춤 중에는 타이머를 다시 걸지 않는다
   const sec = intervalSec || window.__intervalSec || 10;
   intervalHandle = setInterval(advance, sec * 1000);
 }
+
+function setSlideshowPaused(paused) {
+  slideshowPaused = paused;
+  const btn = document.getElementById('btn-pause');
+  btn.textContent = paused ? '▶ 화면 재개' : '⏸ 화면 잠시멈춤';
+  if (paused) {
+    if (intervalHandle) clearInterval(intervalHandle);
+    intervalHandle = null;
+  } else {
+    resetTimer();
+  }
+}
+
+document.getElementById('btn-pause').addEventListener('click', () => {
+  setSlideshowPaused(!slideshowPaused);
+});
 
 function periodCutoff(range) {
   const cutoff = new Date();
@@ -266,7 +333,10 @@ function periodCutoff(range) {
 }
 
 function refreshSlideshow() {
-  if (filteredPhotos.length === 0) filteredPhotos = allPhotos;
+  if (filteredPhotos.length === 0) {
+    showToast('해당 기간 내 사진이 없습니다.');
+    filteredPhotos = allPhotos;
+  }
   currentIndex = 0;
   renderPhotoList();
   showCurrent();
@@ -322,6 +392,7 @@ document.getElementById('btn-reset').addEventListener('click', async (e) => {
 
 async function setFullscreen(on) {
   document.body.classList.toggle('fullscreen', on);
+  document.getElementById('btn-fullscreen').title = on ? '창 모드로 돌아가기 (Esc)' : '전체 화면으로 보기 (Esc로 복귀)';
   await window.api.setFullscreen(on);
 }
 
@@ -355,6 +426,94 @@ document.getElementById('btn-share').addEventListener('click', async () => {
   }
 });
 
+// ---------------- Background music (hidden window playing YouTube embed) ----------------
+
+let musicLoaded = false;
+let musicPlaying = false;
+let musicTitle = '';
+
+function extractYouTubeId(url) {
+  const patterns = [
+    /youtu\.be\/([\w-]{11})/,
+    /youtube\.com\/watch\?v=([\w-]{11})/,
+    /youtube\.com\/embed\/([\w-]{11})/,
+    /youtube\.com\/shorts\/([\w-]{11})/,
+  ];
+  for (const re of patterns) {
+    const m = url.match(re);
+    if (m) return m[1];
+  }
+  return null;
+}
+
+async function loadBgMusic(url) {
+  const videoId = extractYouTubeId(url);
+  const toggleBtn = document.getElementById('btn-music-toggle');
+  const titleEl = document.getElementById('music-title');
+  if (!videoId) {
+    showToast('올바른 YouTube 링크가 아닙니다.');
+    return;
+  }
+
+  toggleBtn.disabled = true;
+  titleEl.textContent = '불러오는 중...';
+  try {
+    const { title } = await window.api.musicLoad(url, videoId);
+    await window.api.musicVolume(Number(document.getElementById('music-volume').value));
+    titleEl.textContent = title || '';
+    toggleBtn.disabled = false;
+    toggleBtn.textContent = '⏸ 일시정지';
+    musicLoaded = true;
+    musicPlaying = true;
+    musicTitle = title || '';
+    refreshCaption();
+  } catch (err) {
+    console.error('[bgmusic]', err);
+    titleEl.textContent = '';
+    showToast('음악을 불러오지 못했습니다: ' + err.message);
+  }
+}
+
+document.getElementById('btn-music-load').addEventListener('click', () => {
+  const url = document.getElementById('music-url').value.trim();
+  if (!url) return;
+  loadBgMusic(url);
+});
+
+document.getElementById('btn-music-toggle').addEventListener('click', async () => {
+  if (!musicLoaded) return;
+  const { playing } = await window.api.musicToggle();
+  document.getElementById('btn-music-toggle').textContent = playing ? '⏸ 일시정지' : '▶ 재생';
+  musicPlaying = playing;
+  refreshCaption();
+});
+
+document.getElementById('music-volume').addEventListener('input', (e) => {
+  if (musicLoaded) window.api.musicVolume(Number(e.target.value));
+});
+
+document.getElementById('btn-music-clear').addEventListener('click', () => {
+  const input = document.getElementById('music-url');
+  input.value = '';
+  input.focus();
+});
+
+document.getElementById('btn-music-open-yt').addEventListener('click', () => {
+  // 유튜브를 보러 가는 동안 슬라이드쇼도 잠시 멈춘다
+  setSlideshowPaused(true);
+  // 입력란에 유효한 링크가 있으면 그 영상으로, 없으면 유튜브 홈으로
+  const url = document.getElementById('music-url').value.trim();
+  const videoId = url ? extractYouTubeId(url) : null;
+  window.api.openExternal(
+    videoId ? `https://www.youtube.com/watch?v=${videoId}` : 'https://www.youtube.com'
+  );
+});
+
+document.getElementById('btn-close-clear').addEventListener('click', async (e) => {
+  e.preventDefault();
+  await window.api.closeAndClear();
+});
+
 async function boot(photos) {
   allPhotos = photos;
   currentIndex = 0;
@@ -362,8 +521,10 @@ async function boot(photos) {
   const cfg = await window.api.getConfig();
   window.__intervalSec = cfg.photoIntervalSec || 10;
 
-  showSlideshow();
-  applyPeriod('all');
+  withSplash(() => {
+    showSlideshow();
+    applyPeriod('all');
+  });
 }
 
 // ---------------- App init ----------------
@@ -372,8 +533,13 @@ async function init() {
   await loadBranding();
   const cfg = await window.api.getConfig();
 
+  if (cfg.bgMusicUrl) {
+    // 지난번 링크를 미리 채워둔다. 재생은 "불러오기"를 눌렀을 때만 시작.
+    document.getElementById('music-url').value = cfg.bgMusicUrl;
+  }
+
   if (!cfg.clientId || !cfg.hasClientSecret) {
-    showOnboarding('credentials');
+    withSplash(() => showOnboarding('credentials'));
     return;
   }
   if (!cfg.hasRefreshToken) {
