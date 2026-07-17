@@ -26,6 +26,28 @@ html, body {
 
 .hidden { display: none !important; }
 
+/* ---------- Splash ---------- */
+
+.splash {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: #000;
+  opacity: 1;
+  transition: opacity 2.2s ease;
+}
+
+.splash img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.splash.fade-out {
+  opacity: 0;
+  pointer-events: none;
+}
+
 /* ---------- Onboarding ---------- */
 
 .onboarding-shell {
@@ -270,8 +292,28 @@ button.link-btn {
   z-index: 5;
 }
 
+.fullscreen-btn .icon-shrink { display: none; }
+body.fullscreen .fullscreen-btn .icon-expand { display: none; }
+body.fullscreen .fullscreen-btn .icon-shrink { display: block; }
+
 /* 전체보기: 오른쪽 패널 숨김 */
 body.fullscreen .info-pane { display: none; }
+
+.fullscreen-caption {
+  display: none;
+  position: absolute;
+  right: 64px;
+  bottom: 24px;
+  text-align: right;
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 12px;
+  line-height: 1.5;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.85);
+  z-index: 5;
+  pointer-events: none;
+}
+
+body.fullscreen .fullscreen-caption { display: block; }
 
 .toast {
   position: absolute;
@@ -354,7 +396,12 @@ button.preset.active {
 .range-row input[type="date"] { flex: 1; min-width: 0; padding: 7px 8px; font-size: 12px; }
 .range-row .tilde { color: var(--text-muted); font-size: 12px; }
 
-#btn-range-apply { width: 100%; margin-top: 0; }
+.filter-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.filter-actions button { flex: 1; margin-top: 0; }
 
 .photo-list-block {
   flex: 1 1 auto;
@@ -409,3 +456,76 @@ button.preset.active {
 }
 
 .settings-block .dot { color: var(--text-muted); font-size: 12px; }
+
+/* ---------- 배경음악 ---------- */
+
+.yt-player-hidden {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  width: 2px;
+  height: 2px;
+  overflow: hidden;
+  opacity: 0.01;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.music-block {
+  flex: none;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.music-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.music-row input[type="text"] {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 9px;
+  font-size: 12px;
+}
+
+.music-row button.secondary.slim { flex: none; margin-top: 0; }
+
+.mini-btn {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  margin-top: 0;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1;
+}
+
+.mini-btn:hover { color: var(--text-main); filter: none; background: rgba(255, 255, 255, 0.14); }
+
+.yt-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+}
+
+#btn-music-load { flex: 1; }
+
+.music-row input[type="range"] {
+  flex: 1;
+  accent-color: var(--accent-strong);
+}
+
+.music-title {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

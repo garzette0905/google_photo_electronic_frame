@@ -9,6 +9,7 @@ const DEFAULTS = {
   clientSecret: '',
   refreshToken: '',
   photoIntervalSec: 10,
+  bgMusicUrl: '',
 };
 
 function load() {

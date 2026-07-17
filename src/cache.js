@@ -42,11 +42,29 @@ function savePhotoList(list) {
 }
 
 function loadPhotoList() {
+  let list;
   try {
-    return JSON.parse(fs.readFileSync(metaPath(), 'utf-8'));
+    list = JSON.parse(fs.readFileSync(metaPath(), 'utf-8'));
   } catch {
     return [];
   }
+  // 이미지 파일이 실제로 남아있는 항목만 반환 (부분 삭제·손상 대비).
+  const alive = list.filter((p) => {
+    const filePath = decodeURI(String(p.fullUrl || '').replace(/^file:\/\//, ''));
+    try { return fs.existsSync(filePath); } catch { return false; }
+  });
+  if (alive.length !== list.length) {
+    if (alive.length === 0) { try { fs.rmSync(metaPath(), { force: true }); } catch {} }
+    else savePhotoList(alive);
+  }
+  return alive;
 }
 
-module.exports = { cacheDir, downloadFull, downloadThumb, savePhotoList, loadPhotoList };
+function clearAll() {
+  // 목록 파일을 먼저 지운다. 이미지 폴더 삭제가 느리거나 실패해도
+  // 목록이 없으면 앱은 '사진 없음' 상태로 새로 시작하므로 깨진 썸네일이 안 뜬다.
+  try { fs.rmSync(metaPath(), { force: true }); } catch {}
+  try { fs.rmSync(cacheDir(), { recursive: true, force: true }); } catch {}
+}
+
+module.exports = { cacheDir, downloadFull, downloadThumb, savePhotoList, loadPhotoList, clearAll };
