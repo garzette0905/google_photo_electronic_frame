@@ -82,7 +82,31 @@ async function loginWithBrowser({ clientId, clientSecret, openUrl }) {
   if (!res.ok) {
     throw new Error(`토큰 교환 실패 (${res.status}): ${await res.text()}`);
   }
-  return res.json(); // { access_token, refresh_token, expires_in, ... }
+  const tokenData = await res.json(); // { access_token, refresh_token, expires_in, scope, ... }
+
+  // 구글의 "개별 권한 동의" 화면에서 사진 선택 권한 체크박스를 빼먹으면 로그인
+  // 자체는 성공하지만, 이후 사진 선택 단계에서야 스코프 부족(403)으로 터진다.
+  // 로그인 시점에 바로 확인해서 여기서 명확히 알려준다.
+  const grantedScopes = (tokenData.scope || '').split(' ');
+  if (!grantedScopes.includes('https://www.googleapis.com/auth/photospicker.mediaitems.readonly')) {
+    throw new Error(
+      '로그인 중 "Google 포토" 권한에 동의하지 않아 사진을 가져올 수 없습니다. ' +
+      '다시 로그인하시고, 동의 화면에서 사진 관련 권한 체크박스를 꼭 체크해주세요.'
+    );
+  }
+
+  return tokenData;
+}
+
+// 사진 선택(Picker) 세션은 로그인한 계정의 권한으로만 완료할 수 있어, 화면에
+// "이 계정으로만 가능합니다"를 표시하려고 이름을 가져온다. scope에 이미 'profile'이
+// 포함되어 있어 별도 스코프 추가 없이 조회 가능하다.
+async function fetchUserInfo(accessToken) {
+  const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!res.ok) return null;
+  return res.json(); // { name, email, picture, ... }
 }
 
 async function refreshAccessToken(clientId, clientSecret, refreshToken) {
@@ -103,4 +127,4 @@ async function refreshAccessToken(clientId, clientSecret, refreshToken) {
   return res.json(); // { access_token, expires_in, ... }
 }
 
-module.exports = { newRequestId, loginWithBrowser, refreshAccessToken };
+module.exports = { newRequestId, loginWithBrowser, refreshAccessToken, fetchUserInfo };

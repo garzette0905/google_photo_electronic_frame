@@ -1,0 +1,88 @@
+# 기억 조각 이어주기 — 웹 버전
+
+데스크톱 앱(Electron)과 동일한 디지털 액자 기능을 브라우저에서 제공하는 웹 서비스입니다.
+설치 없이 PC·태블릿·스마트TV 브라우저에서 접속만 하면 됩니다.
+
+> 데스크톱 앱은 프로젝트 루트에 그대로 있습니다. 이 `web/` 폴더는 독립적인 웹 서버입니다.
+
+## 데모 모드 (계정 연결 없이 보기)
+
+로그인 화면의 **"데모로 보기"** 버튼을 누르면, Google 계정 연결 없이 샘플 사진(`public/demo/`)과
+샘플 배경음악으로 슬라이드쇼 전체 기능(전체화면, 기간필터, 잠시멈춤, 음악, 공유 등)을 바로
+체험할 수 있습니다. 사진 선택/계정 관련 메뉴 대신 "Google 계정으로 로그인하고 내 사진으로 보기"
+링크가 표시됩니다. 데모용 사진을 교체하려면 `public/demo/photos/`에 이미지를 넣고
+`public/demo/photos.json`을 그에 맞게 수정하면 됩니다.
+
+## 데스크톱 앱과의 차이
+
+| 기능 | 데스크톱 앱 | 웹 버전 |
+|---|---|---|
+| 사진 선택 / 슬라이드쇼 / 전체화면 / 기간필터 / 잠시멈춤 | ✅ | ✅ |
+| 배경음악 (YouTube) | ✅ | ✅ (표준 임베드) |
+| 광고 자동 건너뛰기 | ✅ | ❌ (브라우저 보안상 불가) |
+| 설치 없이 어디서나 접속 | ❌ | ✅ |
+| 로그인 유지 | 파일 저장 | 서버 세션(쿠키) |
+
+## 1. Google Cloud Console 설정 (웹용 클라이언트)
+
+데스크톱 앱과 **별도의 OAuth 클라이언트**가 필요합니다.
+
+1. [Google Cloud Console](https://console.cloud.google.com/) → 기존 프로젝트 선택
+2. **API 및 서비스 > 라이브러리** → `Google Photos Picker API` 사용 설정 (이미 했다면 생략)
+3. **Google 인증 플랫폼 > 데이터 액세스** → 스코프에 아래가 포함되어 있는지 확인
+   ```
+   https://www.googleapis.com/auth/photospicker.mediaitems.readonly
+   ```
+4. **Google 인증 플랫폼 > 클라이언트 > + 클라이언트 만들기**
+   - 애플리케이션 유형: **웹 애플리케이션(Web application)**
+   - **승인된 리디렉션 URI**에 아래 추가:
+     - 로컬 테스트: `http://localhost:3000/auth/callback`
+     - 실제 배포 시: `https://<도메인>/auth/callback`
+   - 생성된 **클라이언트 ID / 시크릿** 복사
+
+## 2. 실행
+
+```bash
+cd web
+npm install
+```
+
+환경변수를 지정해 실행합니다 (PowerShell 예시):
+
+```powershell
+$env:GOOGLE_CLIENT_ID="복사한-클라이언트-ID"
+$env:GOOGLE_CLIENT_SECRET="복사한-시크릿"
+$env:SESSION_SECRET="아무-긴-랜덤-문자열"
+npm start
+```
+
+Git Bash / macOS / Linux:
+
+```bash
+GOOGLE_CLIENT_ID="..." GOOGLE_CLIENT_SECRET="..." SESSION_SECRET="..." npm start
+```
+
+브라우저에서 `http://localhost:3000` 접속 → "Google 계정으로 로그인" → 사진 선택 → 슬라이드쇼.
+
+## 3. 실제 배포 시 주의
+
+- **HTTPS 필수**: 구글 OAuth와 클립보드 복사 기능이 https에서만 동작합니다.
+- `BASE_URL` 환경변수를 실제 공개 주소로 지정하고, 그 주소의 `/auth/callback`을 리디렉션 URI에 등록하세요.
+- 공개 서비스로 다른 사람도 쓰게 하려면 구글의 OAuth 앱 심사가 필요합니다. 본인·가족만 쓰면 테스트 사용자 등록으로 충분합니다.
+- 세션은 기본적으로 메모리에 저장되어 서버 재시작 시 재로그인이 필요합니다. 운영 환경에서는 세션 스토어(Redis 등) 연결을 권장합니다.
+
+## 4. 구조
+
+```
+web/
+├── server.js          # Express: OAuth·Picker API·이미지 프록시
+├── package.json
+└── public/
+    ├── index.html     # 화면 구조
+    ├── styles.css     # 스타일
+    ├── app.js         # 프론트엔드 로직
+    └── brand.png      # 브랜딩 이미지
+```
+
+토큰과 클라이언트 시크릿은 **서버에만** 보관되며 브라우저로 전달되지 않습니다. 사진 이미지는
+인증이 필요하므로 서버의 `/img` 프록시를 통해 전달됩니다.

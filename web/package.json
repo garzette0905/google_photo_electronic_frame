@@ -1,0 +1,14 @@
+{
+  "name": "memory-frame-web",
+  "version": "0.1.0",
+  "description": "기억 조각 이어주기 - 웹 버전 (Google Photos Picker API)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "express-session": "^1.18.1",
+    "qrcode": "^1.5.3"
+  }
+}
