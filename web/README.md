@@ -64,12 +64,51 @@ GOOGLE_CLIENT_ID="..." GOOGLE_CLIENT_SECRET="..." SESSION_SECRET="..." npm start
 
 브라우저에서 `http://localhost:3000` 접속 → "Google 계정으로 로그인" → 사진 선택 → 슬라이드쇼.
 
-## 3. 실제 배포 시 주의
+## 3. Render 무료 호스팅으로 배포하기
 
-- **HTTPS 필수**: 구글 OAuth와 클립보드 복사 기능이 https에서만 동작합니다.
-- `BASE_URL` 환경변수를 실제 공개 주소로 지정하고, 그 주소의 `/auth/callback`을 리디렉션 URI에 등록하세요.
-- 공개 서비스로 다른 사람도 쓰게 하려면 구글의 OAuth 앱 심사가 필요합니다. 본인·가족만 쓰면 테스트 사용자 등록으로 충분합니다.
-- 세션은 기본적으로 메모리에 저장되어 서버 재시작 시 재로그인이 필요합니다. 운영 환경에서는 세션 스토어(Redis 등) 연결을 권장합니다.
+이 앱은 Render 배포에 맞게 설정되어 있습니다 (HTTPS 프록시 인식·secure 쿠키·파일 세션 저장 자동 처리).
+
+### 3-1. Render 서비스 생성
+
+1. [Render](https://render.com) 가입 후 대시보드에서 **New + → Web Service**
+2. 이 GitHub 저장소(`google_photo_electronic_frame`)를 연결
+3. 설정값:
+   - **Root Directory**: `web`  ← 중요 (웹 서버가 web/ 하위에 있음)
+   - **Build Command**: `npm install`
+   - **Start Command**: `node server.js`
+   - **Instance Type**: Free
+4. 먼저 **환경변수 없이 한 번 생성**해서 Render가 배정한 주소(예: `https://memory-frame.onrender.com`)를 확인합니다.
+
+### 3-2. 환경변수 등록 (Render 대시보드 → Environment)
+
+| Key | Value |
+|---|---|
+| `GOOGLE_CLIENT_ID` | 웹 애플리케이션 OAuth 클라이언트 ID |
+| `GOOGLE_CLIENT_SECRET` | 그 클라이언트의 시크릿 |
+| `SESSION_SECRET` | 아무 긴 랜덤 문자열 |
+| `BASE_URL` | Render가 배정한 https 주소 (예: `https://memory-frame.onrender.com`, 끝에 `/` 없이) |
+
+저장하면 자동으로 재배포됩니다.
+
+### 3-3. Google Cloud Console에 리디렉션 URI 추가
+
+**클라이언트 > 웹 애플리케이션 클라이언트 편집 > 승인된 리디렉션 URI**에 아래를 추가:
+
+```
+https://<Render가-배정한-주소>/auth/callback
+```
+
+(예: `https://memory-frame.onrender.com/auth/callback`)
+
+### 3-4. 무료 요금제 특성 (알아두기)
+
+- **콜드 스타트**: 15분간 접속이 없으면 서버가 잠들고, 다음 접속 시 깨어나는 데 ~50초 걸립니다. 디지털 액자로 계속 틀어두면 화면이 주기적으로 서버를 호출해 잘 안 잠듭니다.
+- **세션 유지**: 로그인 정보는 파일에 저장되어 서버가 재시작해도 유지됩니다. 단, Render 무료는 디스크가 영구 보존되지 않아(재배포 시 초기화) **코드를 다시 배포하면 재로그인**이 필요할 수 있습니다. 완전한 영구 보존이 필요하면 유료 디스크나 외부 세션 스토어(Redis 등)를 붙이면 됩니다.
+
+### 3-5. 그 외 주의
+
+- 공개 서비스로 다른 사람도 쓰게 하려면 구글의 OAuth 앱 심사가 필요합니다. 본인·가족만 쓰면 **테스트 사용자 등록**으로 충분합니다 (Google 인증 플랫폼 > 대상 > 테스트 사용자).
+- 로컬 실행 시에는 위 설정이 자동으로 http/비-secure 모드로 동작하므로 별도 변경이 필요 없습니다.
 
 ## 4. 구조
 
@@ -77,11 +116,14 @@ GOOGLE_CLIENT_ID="..." GOOGLE_CLIENT_SECRET="..." SESSION_SECRET="..." npm start
 web/
 ├── server.js          # Express: OAuth·Picker API·이미지 프록시
 ├── package.json
+├── sessions/          # 로그인 세션 파일 (자동 생성, git 제외)
 └── public/
     ├── index.html     # 화면 구조
     ├── styles.css     # 스타일
     ├── app.js         # 프론트엔드 로직
-    └── brand.png      # 브랜딩 이미지
+    ├── brand.png      # 브랜딩 이미지
+    ├── favicon.svg    # 브라우저 탭 아이콘
+    └── demo/          # 데모 모드용 샘플 사진 + 목록
 ```
 
 토큰과 클라이언트 시크릿은 **서버에만** 보관되며 브라우저로 전달되지 않습니다. 사진 이미지는

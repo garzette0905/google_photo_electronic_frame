@@ -16,6 +16,7 @@
 const path = require('path');
 const express = require('express');
 const session = require('express-session');
+const FileStore = require('session-file-store')(session);
 const QRCode = require('qrcode');
 
 const PORT = process.env.PORT || 3000;
@@ -24,6 +25,8 @@ const CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
 const CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '';
 const REDIRECT_URI = `${BASE_URL}/auth/callback`;
 const SCOPE = 'email profile https://www.googleapis.com/auth/photospicker.mediaitems.readonly';
+// HTTPS 배포(Render 등)에서는 secure 쿠키를 쓴다. BASE_URL이 https이면 자동 감지.
+const IS_HTTPS = BASE_URL.startsWith('https://');
 
 const PICKER_BASE = 'https://photospicker.googleapis.com/v1';
 const AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
@@ -31,12 +34,25 @@ const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 
 const app = express();
 app.use(express.json());
+
+// Render 등은 앞단 프록시(HTTPS 종단)를 통해 요청이 들어온다. 이 설정이 있어야
+// Express가 원 요청을 HTTPS로 인식해 secure 쿠키가 정상 발급된다.
+if (IS_HTTPS) app.set('trust proxy', 1);
+
 app.use(
   session({
+    // 세션을 파일에 저장한다. 무료 호스팅이 15분 유휴 후 재시작해도 로그인이
+    // 유지된다(메모리 저장 시엔 재시작마다 재로그인 필요). ./sessions 폴더에 저장.
+    store: new FileStore({ path: path.join(__dirname, 'sessions'), retries: 1, ttl: 30 * 24 * 60 * 60 }),
     secret: process.env.SESSION_SECRET || 'memory-frame-dev-secret-change-me',
     resave: false,
     saveUninitialized: false,
-    cookie: { maxAge: 30 * 24 * 60 * 60 * 1000 }, // 30일
+    cookie: {
+      maxAge: 30 * 24 * 60 * 60 * 1000, // 30일
+      httpOnly: true,
+      secure: IS_HTTPS,
+      sameSite: 'lax', // OAuth 리디렉션(구글 → 콜백) 시 쿠키가 유지되도록
+    },
   })
 );
 
