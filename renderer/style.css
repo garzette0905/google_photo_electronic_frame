@@ -119,6 +119,17 @@ html, body {
 
 .hint.dark { color: #4a5872; }
 
+.account-notice {
+  background: #fff3cd;
+  border: 1px solid #f0d98c;
+  color: #6b5300;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 12px;
+  border-radius: 8px;
+  margin: 0 0 10px;
+}
+
 .steps {
   margin: 0 0 10px;
   padding-left: 20px;

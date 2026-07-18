@@ -111,11 +111,20 @@ async function runPickerFlow() {
   const errEl = document.getElementById('source-error');
   const retryEl = document.getElementById('btn-source-retry');
   const openBtn = document.getElementById('btn-source-open');
+  const noticeEl = document.getElementById('account-notice');
   qrEl.classList.add('hidden');
   errEl.classList.add('hidden');
   retryEl.classList.add('hidden');
   openBtn.classList.add('hidden');
   statusEl.textContent = '선택 화면을 준비하는 중...';
+
+  const cfg = await window.api.getConfig();
+  if (cfg.userName) {
+    noticeEl.textContent = `사진은 ${cfg.userName} 계정으로만 가능합니다.`;
+    noticeEl.classList.remove('hidden');
+  } else {
+    noticeEl.classList.add('hidden');
+  }
 
   try {
     const result = await window.api.startPickerSession();

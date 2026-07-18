@@ -10,6 +10,7 @@ const DEFAULTS = {
   refreshToken: '',
   photoIntervalSec: 10,
   bgMusicUrl: '',
+  userName: '',
 };
 
 function load() {

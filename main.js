@@ -80,6 +80,7 @@ ipcMain.handle('config:get', () => {
     hasRefreshToken: !!cfg.refreshToken,
     photoIntervalSec: cfg.photoIntervalSec,
     bgMusicUrl: cfg.bgMusicUrl,
+    userName: cfg.userName,
   };
 });
 
@@ -99,7 +100,7 @@ ipcMain.handle('config:setBgMusicUrl', (e, url) => {
 });
 
 ipcMain.handle('app:reset', () => {
-  config.save({ refreshToken: '' });
+  config.save({ refreshToken: '', userName: '' });
   session.accessToken = null;
   session.expiresAt = 0;
   session.pickerSessionId = null;
@@ -121,6 +122,10 @@ ipcMain.handle('auth:startBrowserLogin', async () => {
     session.accessToken = tokenData.access_token;
     session.expiresAt = Date.now() + tokenData.expires_in * 1000;
     if (tokenData.refresh_token) config.save({ refreshToken: tokenData.refresh_token });
+
+    const profile = await auth.fetchUserInfo(tokenData.access_token).catch(() => null);
+    if (profile?.name) config.save({ userName: profile.name });
+
     return true;
   } catch (err) {
     throw new Error(err.message);
@@ -132,6 +137,14 @@ ipcMain.handle('auth:startBrowserLogin', async () => {
 // one-shot, so refreshing the photo set means creating a brand new session.
 ipcMain.handle('picker:startSession', async () => {
   const accessToken = await ensureAccessToken();
+
+  // 이 기능이 추가되기 전에 이미 로그인해둔 사용자는 저장된 이름이 없으므로,
+  // 재로그인을 요구하지 않고 여기서 한 번 조회해 채워둔다.
+  if (!config.load().userName) {
+    const profile = await auth.fetchUserInfo(accessToken).catch(() => null);
+    if (profile?.name) config.save({ userName: profile.name });
+  }
+
   const requestId = session.requestId || auth.newRequestId();
 
   const picking = await picker.createSession(accessToken, requestId);
