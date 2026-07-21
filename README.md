@@ -4,6 +4,8 @@
 
 > 참고: 처음에는 Ambient API(사진을 지속 자동 동기화하는 방식)로 설계했지만, 이 API는 구글 파트너 프로그램 승인이 있어야만 접근 가능한 것으로 확인되어 **Picker API**로 전환했습니다. Picker API는 승인 없이 바로 사용 가능한 대신, 새 사진을 반영하려면 "사진 다시 선택하기"를 수동으로 눌러줘야 합니다.
 
+> 📌 향후 기능 개발 방향과 상용 전자액자 대비 격차 분석은 [docs/ROADMAP.md](docs/ROADMAP.md) 참고.
+
 ## 1. 사전 준비: Google Cloud Console 설정
 
 1. [Google Cloud Console](https://console.cloud.google.com/)에서 새 프로젝트 생성
