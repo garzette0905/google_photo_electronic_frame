@@ -124,14 +124,10 @@ button.secondary.slim { padding: 8px 12px; font-size: 12.5px; font-weight: 500; 
 .photo-actions { position: absolute; left: 16px; bottom: 16px; display: flex; gap: 8px; z-index: 5; }
 .fullscreen-btn { position: absolute; right: 16px; z-index: 5; }
 .fullscreen-btn.fs-bottom { bottom: 16px; }
-.fullscreen-btn.fs-top { top: 16px; }
 .fullscreen-btn .icon-shrink { display: none; }
 body.fullscreen .fullscreen-btn .icon-expand { display: none; }
 body.fullscreen .fullscreen-btn .icon-shrink { display: block; }
 body.fullscreen .info-pane { display: none; }
-
-/* 상단 전체화면 버튼은 기본(데스크톱) 숨김, 모바일에서만 노출 */
-.mobile-only { display: none; }
 
 .fullscreen-caption {
   display: none; position: absolute; right: 64px; bottom: 24px; text-align: right;
@@ -241,8 +237,6 @@ button.preset.active { background: var(--accent-strong); color: #fff; }
     border-left: none; border-top: 1px solid var(--border);
   }
 
-  /* 상단 전체화면 버튼 노출 (하단 버튼과 함께 두 곳) */
-  .mobile-only { display: flex; }
   /* 손가락 터치 대비 살짝 크게 + 항상 잘 보이게 */
   .photo-pane .icon-btn { width: 44px; height: 44px; opacity: 0.85; }
 

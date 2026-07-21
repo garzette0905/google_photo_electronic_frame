@@ -334,7 +334,6 @@ function setFullscreen(on) {
 }
 const toggleFullscreen = () => setFullscreen(!document.body.classList.contains('fullscreen'));
 document.getElementById('btn-fullscreen').addEventListener('click', toggleFullscreen);
-document.getElementById('btn-fullscreen-top').addEventListener('click', toggleFullscreen);
 document.addEventListener('fullscreenchange', () => {
   // 사용자가 F11/Esc로 직접 빠져나온 경우 상태 동기화
   document.body.classList.toggle('fullscreen', !!document.fullscreenElement);
@@ -388,6 +387,8 @@ document.getElementById('btn-share').addEventListener('click', async () => {
 });
 
 // ---------- 배경음악 (YouTube IFrame API) ----------
+// 데모·로그인 모두 처음 진입 시 이 곡을 기본 배경음악으로 채운다.
+const DEFAULT_MUSIC_URL = 'https://www.youtube.com/watch?v=wqX7AxcYTj8';
 let ytPlayer = null;
 let ytReady = null;
 let musicLoaded = false;
@@ -533,8 +534,9 @@ function boot(photos) {
   const allRadio = document.querySelector('#orientation-radios input[value="all"]');
   if (allRadio) allRadio.checked = true;
   if (!isDemoMode) {
+    // 이전에 직접 설정한 곡이 있으면 그것을, 없으면 기본 곡을 채운다.
     const saved = (() => { try { return localStorage.getItem('bgMusicUrl'); } catch { return null; } })();
-    if (saved) document.getElementById('music-url').value = saved;
+    document.getElementById('music-url').value = saved || DEFAULT_MUSIC_URL;
   }
   document.getElementById('demo-badge').classList.toggle('hidden', !isDemoMode);
   document.getElementById('account-links').classList.toggle('hidden', isDemoMode);
