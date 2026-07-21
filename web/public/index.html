@@ -117,6 +117,15 @@
         </div>
       </div>
 
+      <div class="filter-block">
+        <div class="section-label">사진 방향</div>
+        <div id="orientation-radios" class="radio-row">
+          <label><input type="radio" name="orientation" value="all" checked /> 전체보기</label>
+          <label><input type="radio" name="orientation" value="landscape" /> 가로보기</label>
+          <label><input type="radio" name="orientation" value="portrait" /> 세로보기</label>
+        </div>
+      </div>
+
       <div class="photo-list-block">
         <div class="section-label">사진 목록 (<span id="photo-list-count">0</span>)</div>
         <div id="photo-list-strip" class="thumb-grid"></div>
@@ -134,12 +143,11 @@
               <rect x="0" y="0" width="28" height="20" rx="4.5" fill="#FF0000"/>
               <polygon points="11,5 20,10 11,15" fill="#fff"/>
             </svg>
-            YouTube
+            Youtube연결
           </button>
-          <button id="btn-music-load" class="secondary slim">불러오기</button>
+          <button id="btn-music-load" class="secondary slim">▶ 재생하기</button>
         </div>
         <div class="music-row">
-          <button id="btn-music-toggle" class="secondary slim" disabled>▶ 재생</button>
           <input type="range" id="music-volume" min="0" max="100" value="60" />
         </div>
         <div id="music-title" class="music-title"></div>

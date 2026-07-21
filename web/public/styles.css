@@ -160,6 +160,10 @@ button.preset.active { background: var(--accent-strong); color: #fff; }
 .filter-actions { display: flex; gap: 6px; }
 .filter-actions button { flex: 1; }
 
+.radio-row { display: flex; gap: 10px; flex-wrap: wrap; }
+.radio-row label { display: flex; align-items: center; gap: 4px; font-size: 12.5px; color: var(--text-main); cursor: pointer; }
+.radio-row input[type="radio"] { accent-color: var(--accent-strong); cursor: pointer; }
+
 .photo-list-block { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
 .thumb-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; overflow-y: auto; align-content: start; padding-right: 2px; }
 .thumb-grid::-webkit-scrollbar { width: 6px; }

@@ -249,9 +249,12 @@ app.get(
       (data.mediaItems || []).forEach((it) => {
         const base = it.mediaFile?.baseUrl;
         if (!base) return;
+        const meta = it.mediaFile?.mediaFileMetadata || {};
         items.push({
           id: it.id,
           createTime: it.createTime,
+          width: Number(meta.width) || null,
+          height: Number(meta.height) || null,
           fullUrl: `/img?u=${encodeURIComponent(base)}&sz=w1920-h1080`,
           thumbUrl: `/img?u=${encodeURIComponent(base)}&sz=w300-h300-c`,
         });
@@ -259,7 +262,8 @@ app.get(
       pageToken = data.nextPageToken;
     } while (pageToken);
 
-    items.sort((a, b) => new Date(b.createTime) - new Date(a.createTime));
+    // 촬영일 오름차순(가장 먼저 찍은 사진부터)으로 정렬
+    items.sort((a, b) => new Date(a.createTime) - new Date(b.createTime));
     res.json({ items });
   })
 );

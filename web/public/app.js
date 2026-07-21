@@ -256,7 +256,10 @@ function setSlideshowPaused(paused) {
 }
 document.getElementById('btn-pause').addEventListener('click', () => setSlideshowPaused(!slideshowPaused));
 
-// ---------- 기간 필터 ----------
+// ---------- 기간 + 방향 필터 ----------
+let periodFilterFn = () => true; // 현재 기간 조건
+let orientationMode = 'all'; // 'all' | 'landscape' | 'portrait'
+
 function periodCutoff(range) {
   const c = new Date();
   if (range === 'week') c.setDate(c.getDate() - 7);
@@ -265,36 +268,63 @@ function periodCutoff(range) {
   else return null;
   return c;
 }
-function refreshSlideshow() {
-  if (!filteredPhotos.length) { showToast('해당 기간 내 사진이 없습니다.'); filteredPhotos = allPhotos; }
+
+function orientationOf(p) {
+  if (!p.width || !p.height) return null; // 크기 정보 없으면 방향 미상
+  return p.width >= p.height ? 'landscape' : 'portrait';
+}
+
+// 기간·방향 조건을 함께 적용해 현재 표시할 사진 목록을 다시 계산한다.
+function recomputeFiltered() {
+  let list = allPhotos.filter(periodFilterFn);
+  if (!list.length) {
+    showToast('해당 기간 내 사진이 없습니다.');
+    list = allPhotos; // 기간 조건 무시하고 전체로 복귀
+  }
+  if (orientationMode !== 'all') {
+    const byOrient = list.filter((p) => orientationOf(p) === orientationMode);
+    if (!byOrient.length) {
+      showToast(orientationMode === 'landscape' ? '가로 사진이 없습니다.' : '세로 사진이 없습니다.');
+      orientationMode = 'all';
+      const allRadio = document.querySelector('#orientation-radios input[value="all"]');
+      if (allRadio) allRadio.checked = true;
+    } else {
+      list = byOrient;
+    }
+  }
+  filteredPhotos = list;
   currentIndex = 0;
   renderPhotoList();
   showCurrent();
   resetTimer();
 }
+
 function applyPeriod(range) {
   const cutoff = periodCutoff(range);
-  filteredPhotos = cutoff ? allPhotos.filter((p) => new Date(p.createTime) >= cutoff) : allPhotos;
+  periodFilterFn = cutoff ? (p) => new Date(p.createTime) >= cutoff : () => true;
   document.getElementById('filter-start').value = '';
   document.getElementById('filter-end').value = '';
   document.querySelectorAll('#period-presets .preset').forEach((b) => b.classList.toggle('active', b.dataset.range === range));
-  refreshSlideshow();
+  recomputeFiltered();
 }
 function applyCustomRange() {
   const start = document.getElementById('filter-start').value;
   const end = document.getElementById('filter-end').value;
   if (!start && !end) { applyPeriod('all'); return; }
-  filteredPhotos = allPhotos.filter((p) => {
+  periodFilterFn = (p) => {
     const d = p.createTime.slice(0, 10);
     if (start && d < start) return false;
     if (end && d > end) return false;
     return true;
-  });
+  };
   document.querySelectorAll('#period-presets .preset').forEach((b) => b.classList.remove('active'));
-  refreshSlideshow();
+  recomputeFiltered();
 }
 document.querySelectorAll('#period-presets .preset').forEach((b) => b.addEventListener('click', () => applyPeriod(b.dataset.range)));
 document.getElementById('btn-range-apply').addEventListener('click', applyCustomRange);
+document.querySelectorAll('#orientation-radios input').forEach((r) =>
+  r.addEventListener('change', () => { if (r.checked) { orientationMode = r.value; recomputeFiltered(); } })
+);
 
 // ---------- 전체화면 / 공유 ----------
 function setFullscreen(on) {
@@ -334,6 +364,11 @@ function toPngBlob(url) {
     img.src = url;
   });
 }
+
+// 모바일폰(Android/iPhone/iPod)에서는 클립보드 이미지 복사가 사실상 동작하지 않으므로
+// 공유(복사) 버튼 자체를 숨긴다. 데스크톱/태블릿에서는 그대로 노출.
+const IS_PHONE = /Android|iPhone|iPod/i.test(navigator.userAgent);
+if (IS_PHONE) document.getElementById('btn-share').classList.add('hidden');
 
 document.getElementById('btn-share').addEventListener('click', async () => {
   const photo = filteredPhotos[currentIndex];
@@ -375,9 +410,11 @@ function extractYouTubeId(url) {
   return null;
 }
 
+let loadedVideoId = null;
+
 async function loadBgMusic(url) {
   const videoId = extractYouTubeId(url);
-  const toggleBtn = document.getElementById('btn-music-toggle');
+  const playBtn = document.getElementById('btn-music-load');
   const titleEl = document.getElementById('music-title');
   if (!videoId) { showToast('올바른 YouTube 링크가 아닙니다.'); return; }
 
@@ -392,8 +429,9 @@ async function loadBgMusic(url) {
         events: {
           onReady: (e) => { e.target.playVideo(); resolve(); },
           onStateChange: (e) => {
-            if (e.data === YT.PlayerState.PLAYING) { toggleBtn.textContent = '⏸ 일시정지'; musicPlaying = true; }
-            else if (e.data === YT.PlayerState.PAUSED) { toggleBtn.textContent = '▶ 재생'; musicPlaying = false; }
+            // 재생/일시정지 버튼을 하나로 통합: 재생 중이면 일시정지, 아니면 재생하기
+            if (e.data === YT.PlayerState.PLAYING) { playBtn.textContent = '⏸ 일시정지'; musicPlaying = true; }
+            else if (e.data === YT.PlayerState.PAUSED) { playBtn.textContent = '▶ 재생하기'; musicPlaying = false; }
             refreshCaption();
           },
           onError: () => showToast('이 영상은 재생할 수 없습니다 (퍼가기 금지 등).'),
@@ -402,22 +440,26 @@ async function loadBgMusic(url) {
     });
     ytPlayer.setVolume(Number(document.getElementById('music-volume').value));
   }
+  loadedVideoId = videoId;
   musicLoaded = true;
   musicPlaying = true;
   musicTitle = '';
-  toggleBtn.disabled = false;
+  playBtn.textContent = '⏸ 일시정지';
   setTimeout(() => {
     try { musicTitle = ytPlayer.getVideoData()?.title || ''; titleEl.textContent = musicTitle; refreshCaption(); } catch {}
   }, 900);
   try { localStorage.setItem('bgMusicUrl', url); } catch {}
 }
 
+// "▶ 재생하기" 버튼: 처음이거나 링크가 바뀌었으면 로드/재생, 이미 로드됐으면 재생↔일시정지 토글
 document.getElementById('btn-music-load').addEventListener('click', () => {
   const url = document.getElementById('music-url').value.trim();
-  if (url) loadBgMusic(url);
-});
-document.getElementById('btn-music-toggle').addEventListener('click', () => {
-  if (!ytPlayer) return;
+  const id = url ? extractYouTubeId(url) : null;
+  if (!musicLoaded || (id && id !== loadedVideoId)) {
+    if (url) loadBgMusic(url);
+    else showToast('YouTube 링크를 입력하세요.');
+    return;
+  }
   if (ytPlayer.getPlayerState() === YT.PlayerState.PLAYING) ytPlayer.pauseVideo();
   else ytPlayer.playVideo();
 });
@@ -484,6 +526,10 @@ document.getElementById('btn-demo-home').addEventListener('click', (e) => {
 function boot(photos) {
   allPhotos = photos;
   currentIndex = 0;
+  // 방향 필터는 새로 시작할 때 항상 전체보기로 초기화
+  orientationMode = 'all';
+  const allRadio = document.querySelector('#orientation-radios input[value="all"]');
+  if (allRadio) allRadio.checked = true;
   if (!isDemoMode) {
     const saved = (() => { try { return localStorage.getItem('bgMusicUrl'); } catch { return null; } })();
     if (saved) document.getElementById('music-url').value = saved;
