@@ -122,11 +122,16 @@ button.secondary.slim { padding: 8px 12px; font-size: 12.5px; font-weight: 500; 
 }
 .icon-btn:hover { opacity: 1; background: rgba(0,0,0,0.7); filter: none; }
 .photo-actions { position: absolute; left: 16px; bottom: 16px; display: flex; gap: 8px; z-index: 5; }
-.fullscreen-btn { position: absolute; right: 16px; bottom: 16px; z-index: 5; }
+.fullscreen-btn { position: absolute; right: 16px; z-index: 5; }
+.fullscreen-btn.fs-bottom { bottom: 16px; }
+.fullscreen-btn.fs-top { top: 16px; }
 .fullscreen-btn .icon-shrink { display: none; }
 body.fullscreen .fullscreen-btn .icon-expand { display: none; }
 body.fullscreen .fullscreen-btn .icon-shrink { display: block; }
 body.fullscreen .info-pane { display: none; }
+
+/* 상단 전체화면 버튼은 기본(데스크톱) 숨김, 모바일에서만 노출 */
+.mobile-only { display: none; }
 
 .fullscreen-caption {
   display: none; position: absolute; right: 64px; bottom: 24px; text-align: right;
@@ -222,3 +227,27 @@ button.preset.active { background: var(--accent-strong); color: #fff; }
 .modal-block b { color: var(--accent); }
 .modal-en { font-size: 12.5px; color: var(--text-muted); }
 .modal-card .btn-primary { display: block; width: 100%; margin-top: 6px; }
+
+/* ---------- 모바일 (세로 스택 + 스크롤 허용) ---------- */
+@media (max-width: 768px) {
+  /* 화면이 잘리면 스크롤해서 전부 볼 수 있도록 세로 스크롤 허용 */
+  html, body { overflow-y: auto; overflow-x: hidden; height: auto; min-height: 100%; }
+
+  /* 사진 위 / 정보 패널 아래로 세로 배치 */
+  .slideshow { flex-direction: column; height: auto; min-height: 100vh; }
+  .photo-pane { flex: none; width: 100%; height: 60vh; }
+  .info-pane {
+    flex: none; width: 100%; height: auto; overflow: visible;
+    border-left: none; border-top: 1px solid var(--border);
+  }
+
+  /* 상단 전체화면 버튼 노출 (하단 버튼과 함께 두 곳) */
+  .mobile-only { display: flex; }
+  /* 손가락 터치 대비 살짝 크게 + 항상 잘 보이게 */
+  .photo-pane .icon-btn { width: 44px; height: 44px; opacity: 0.85; }
+
+  /* 전체화면일 때는 사진이 화면을 꽉 채우고 스크롤 없이 */
+  body.fullscreen { overflow: hidden; }
+  body.fullscreen .slideshow { height: 100vh; min-height: 100vh; }
+  body.fullscreen .photo-pane { height: 100vh; }
+}

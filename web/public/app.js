@@ -332,7 +332,9 @@ function setFullscreen(on) {
   if (on) document.documentElement.requestFullscreen?.().catch(() => {});
   else if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
 }
-document.getElementById('btn-fullscreen').addEventListener('click', () => setFullscreen(!document.body.classList.contains('fullscreen')));
+const toggleFullscreen = () => setFullscreen(!document.body.classList.contains('fullscreen'));
+document.getElementById('btn-fullscreen').addEventListener('click', toggleFullscreen);
+document.getElementById('btn-fullscreen-top').addEventListener('click', toggleFullscreen);
 document.addEventListener('fullscreenchange', () => {
   // 사용자가 F11/Esc로 직접 빠져나온 경우 상태 동기화
   document.body.classList.toggle('fullscreen', !!document.fullscreenElement);
