@@ -87,6 +87,12 @@ function updateMusicBtn() {
 }
 document.getElementById('btn-music').addEventListener('click', () => (musicOn ? stopMusic() : startMusic()));
 
+// ---- 홈으로 이동 ----
+document.getElementById('btn-home').addEventListener('click', () => {
+  stopMusic();
+  location.href = '/';
+});
+
 // ---- 초기화 ----
 async function init() {
   try {
