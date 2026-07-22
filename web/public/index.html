@@ -99,20 +99,7 @@
       </div>
 
       <div class="filter-block">
-        <div class="section-label">기간</div>
-        <div id="period-presets" class="preset-row">
-          <button class="preset" data-range="all">전체</button>
-          <button class="preset" data-range="week">1주</button>
-          <button class="preset" data-range="month">1개월</button>
-          <button class="preset" data-range="year">1년</button>
-        </div>
-        <div class="range-row">
-          <input type="date" id="filter-start" />
-          <span class="tilde">~</span>
-          <input type="date" id="filter-end" />
-        </div>
         <div class="filter-actions">
-          <button id="btn-range-apply" class="secondary slim">기간 적용</button>
           <button id="btn-pause" class="secondary slim">⏸ 화면 잠시멈춤</button>
         </div>
       </div>
@@ -128,18 +115,17 @@
 
       <div class="photo-list-block">
         <div class="section-label">사진 목록 (<span id="photo-list-count">0</span>)</div>
+        <div id="exclude-actions" class="exclude-actions hidden">
+          <span class="exclude-info">선택 <span id="exclude-count">0</span>장</span>
+          <button id="btn-exclude-apply" class="secondary slim">선택 제외</button>
+          <button id="btn-exclude-cancel" class="secondary slim">취소</button>
+        </div>
         <div id="photo-list-strip" class="thumb-grid"></div>
       </div>
 
       <div class="share-block" id="share-block">
         <div class="section-label">공유</div>
-        <button id="btn-make-share" class="secondary slim share-btn">
-          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
-            <line x1="8.6" y1="10.5" x2="15.4" y2="6.5"/><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/>
-          </svg>
-          실시간 공유 링크 만들기
-        </button>
+        <button id="btn-make-share" class="secondary slim share-btn">실시간 공유 링크 만들기</button>
       </div>
 
       <div class="music-block">
@@ -168,6 +154,10 @@
       <div class="settings-block">
         <span id="account-links" class="account-links">
           <a href="#" id="btn-reselect" class="text-link small">사진 다시 선택하기</a>
+          <span class="dot">·</span>
+          <a href="#" id="btn-add" class="text-link small">사진 추가</a>
+          <span class="dot">·</span>
+          <a href="#" id="btn-exclude" class="text-link small">사진 제외</a>
           <span class="dot">·</span>
           <a href="/auth/login" id="btn-reconnect" class="text-link small">계정 다시 연결하기</a>
           <span class="dot">·</span>

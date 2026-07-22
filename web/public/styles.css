@@ -169,10 +169,26 @@ button.preset.active { background: var(--accent-strong); color: #fff; }
 .thumb-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; overflow-y: auto; align-content: start; padding-right: 2px; }
 .thumb-grid::-webkit-scrollbar { width: 6px; }
 .thumb-grid::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 3px; }
-.thumb-grid img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 7px; cursor: pointer; border: 2px solid transparent; opacity: 0.55; transition: opacity 0.15s ease; }
-.thumb-grid img:hover { border-color: var(--accent); opacity: 1; }
-.thumb-grid img.current { border-color: var(--accent); opacity: 1; }
+.thumb-cell { position: relative; cursor: pointer; }
+.thumb-grid img { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 7px; border: 2px solid transparent; opacity: 0.55; transition: opacity 0.15s ease; }
+.thumb-cell:hover img { border-color: var(--accent); opacity: 1; }
+.thumb-cell.current img { border-color: var(--accent); opacity: 1; }
 .thumb-grid .empty { grid-column: 1 / -1; font-size: 12px; color: var(--text-muted); }
+
+/* 사진 제외 선택 모드 */
+.check-mark {
+  position: absolute; top: 3px; right: 3px; width: 18px; height: 18px; border-radius: 50%;
+  background: rgba(0,0,0,0.5); color: #fff; font-size: 12px; line-height: 18px; text-align: center;
+  border: 1.5px solid #fff; display: none;
+}
+.thumb-grid.selecting .thumb-cell img { opacity: 0.9; }
+.thumb-grid.selecting .thumb-cell .check-mark { display: block; }
+.thumb-grid.selecting .thumb-cell.sel img { border-color: #e05b5b; opacity: 1; }
+.thumb-grid.selecting .thumb-cell.sel .check-mark { background: #e05b5b; }
+
+.exclude-actions { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.exclude-actions .exclude-info { font-size: 12px; color: var(--text-muted); margin-right: auto; }
+.exclude-actions button { flex: none; }
 
 .music-block { flex: none; padding-top: 10px; border-top: 1px solid var(--border); }
 .music-row { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; }

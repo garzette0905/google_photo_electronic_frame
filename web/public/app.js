@@ -131,8 +131,17 @@ async function startSync() {
       setTimeout(startPickerFlow, 1500);
       return;
     }
-    boot(items);
+    let finalItems = items;
+    if (appendMode && allPhotos.length) {
+      // "사진 추가": 기존 사진에 새 사진을 덧붙이고(중복 id 제거) 촬영일 오름차순 정렬
+      const seen = new Set(allPhotos.map((p) => p.id));
+      const fresh = items.filter((it) => !seen.has(it.id));
+      finalItems = allPhotos.concat(fresh).sort((a, b) => new Date(a.createTime) - new Date(b.createTime));
+    }
+    appendMode = false;
+    boot(finalItems);
   } catch (err) {
+    appendMode = false;
     statusEl.textContent = '불러오기 실패: ' + err.message;
   }
 }
@@ -144,6 +153,9 @@ let currentIndex = 0;
 let intervalHandle = null;
 let activeLayer = 'a';
 let slideshowPaused = false;
+let appendMode = false;      // "사진 추가" 진행 중이면 새 사진을 기존에 덧붙임
+let excludeMode = false;     // "사진 제외" 선택 모드
+const excludeSel = new Set(); // 제외로 체크된 사진 id
 
 function formatDate(iso) {
   const d = new Date(iso);
@@ -156,6 +168,7 @@ function formatDate(iso) {
 function renderPhotoList() {
   const strip = document.getElementById('photo-list-strip');
   strip.innerHTML = '';
+  strip.classList.toggle('selecting', excludeMode);
   document.getElementById('photo-list-count').textContent = filteredPhotos.length;
   if (!filteredPhotos.length) {
     const span = document.createElement('span');
@@ -165,13 +178,32 @@ function renderPhotoList() {
     return;
   }
   filteredPhotos.forEach((p) => {
+    const cell = document.createElement('div');
+    cell.className = 'thumb-cell';
     const img = document.createElement('img');
     img.src = p.thumbUrl;
     img.title = formatDate(p.createTime).main;
-    img.addEventListener('click', () => jumpTo(p.id));
-    strip.appendChild(img);
+    cell.appendChild(img);
+
+    if (excludeMode) {
+      // 제외 모드: 클릭하면 선택 토글 (재생 이동 대신)
+      if (excludeSel.has(p.id)) cell.classList.add('sel');
+      const mark = document.createElement('span');
+      mark.className = 'check-mark';
+      mark.textContent = '✓';
+      cell.appendChild(mark);
+      cell.addEventListener('click', () => {
+        if (excludeSel.has(p.id)) excludeSel.delete(p.id);
+        else excludeSel.add(p.id);
+        cell.classList.toggle('sel');
+        document.getElementById('exclude-count').textContent = excludeSel.size;
+      });
+    } else {
+      cell.addEventListener('click', () => jumpTo(p.id));
+    }
+    strip.appendChild(cell);
   });
-  updateActiveThumb();
+  if (!excludeMode) updateActiveThumb();
 }
 
 function updateActiveThumb() {
@@ -256,31 +288,17 @@ function setSlideshowPaused(paused) {
 }
 document.getElementById('btn-pause').addEventListener('click', () => setSlideshowPaused(!slideshowPaused));
 
-// ---------- 기간 + 방향 필터 ----------
-let periodFilterFn = () => true; // 현재 기간 조건
+// ---------- 방향 필터 ----------
 let orientationMode = 'all'; // 'all' | 'landscape' | 'portrait'
-
-function periodCutoff(range) {
-  const c = new Date();
-  if (range === 'week') c.setDate(c.getDate() - 7);
-  else if (range === 'month') c.setMonth(c.getMonth() - 1);
-  else if (range === 'year') c.setFullYear(c.getFullYear() - 1);
-  else return null;
-  return c;
-}
 
 function orientationOf(p) {
   if (!p.width || !p.height) return null; // 크기 정보 없으면 방향 미상
   return p.width >= p.height ? 'landscape' : 'portrait';
 }
 
-// 기간·방향 조건을 함께 적용해 현재 표시할 사진 목록을 다시 계산한다.
+// 방향 조건을 적용해 현재 표시할 사진 목록을 다시 계산한다.
 function recomputeFiltered() {
-  let list = allPhotos.filter(periodFilterFn);
-  if (!list.length) {
-    showToast('해당 기간 내 사진이 없습니다.');
-    list = allPhotos; // 기간 조건 무시하고 전체로 복귀
-  }
+  let list = allPhotos;
   if (orientationMode !== 'all') {
     const byOrient = list.filter((p) => orientationOf(p) === orientationMode);
     if (!byOrient.length) {
@@ -299,29 +317,6 @@ function recomputeFiltered() {
   resetTimer();
 }
 
-function applyPeriod(range) {
-  const cutoff = periodCutoff(range);
-  periodFilterFn = cutoff ? (p) => new Date(p.createTime) >= cutoff : () => true;
-  document.getElementById('filter-start').value = '';
-  document.getElementById('filter-end').value = '';
-  document.querySelectorAll('#period-presets .preset').forEach((b) => b.classList.toggle('active', b.dataset.range === range));
-  recomputeFiltered();
-}
-function applyCustomRange() {
-  const start = document.getElementById('filter-start').value;
-  const end = document.getElementById('filter-end').value;
-  if (!start && !end) { applyPeriod('all'); return; }
-  periodFilterFn = (p) => {
-    const d = p.createTime.slice(0, 10);
-    if (start && d < start) return false;
-    if (end && d > end) return false;
-    return true;
-  };
-  document.querySelectorAll('#period-presets .preset').forEach((b) => b.classList.remove('active'));
-  recomputeFiltered();
-}
-document.querySelectorAll('#period-presets .preset').forEach((b) => b.addEventListener('click', () => applyPeriod(b.dataset.range)));
-document.getElementById('btn-range-apply').addEventListener('click', applyCustomRange);
 document.querySelectorAll('#orientation-radios input').forEach((r) =>
   r.addEventListener('change', () => { if (r.checked) { orientationMode = r.value; recomputeFiltered(); } })
 );
@@ -525,6 +520,13 @@ shareModal.addEventListener('click', (e) => { if (e.target === shareModal) share
 // ---------- 하단 링크 ----------
 document.getElementById('btn-reselect').addEventListener('click', (e) => {
   e.preventDefault();
+  appendMode = false; // 다시 선택 = 교체
+  if (intervalHandle) clearInterval(intervalHandle);
+  startPickerFlow();
+});
+document.getElementById('btn-add').addEventListener('click', (e) => {
+  e.preventDefault();
+  appendMode = true; // 사진 추가 = 기존에 덧붙임
   if (intervalHandle) clearInterval(intervalHandle);
   startPickerFlow();
 });
@@ -532,6 +534,33 @@ document.getElementById('btn-logout').addEventListener('click', async (e) => {
   e.preventDefault();
   await api('/api/logout', { method: 'POST' }).catch(() => {});
   location.href = '/';
+});
+
+// ---------- 사진 제외 (체크박스 선택 삭제) ----------
+function setExcludeMode(on) {
+  excludeMode = on;
+  excludeSel.clear();
+  document.getElementById('exclude-count').textContent = '0';
+  document.getElementById('exclude-actions').classList.toggle('hidden', !on);
+  document.getElementById('btn-exclude').textContent = on ? '제외 취소' : '사진 제외';
+  if (on && intervalHandle) clearInterval(intervalHandle); // 선택 중엔 슬라이드 정지
+  renderPhotoList();
+  if (!on) resetTimer();
+}
+document.getElementById('btn-exclude').addEventListener('click', (e) => {
+  e.preventDefault();
+  setExcludeMode(!excludeMode);
+});
+document.getElementById('btn-exclude-cancel').addEventListener('click', () => setExcludeMode(false));
+document.getElementById('btn-exclude-apply').addEventListener('click', () => {
+  if (!excludeSel.size) { setExcludeMode(false); return; }
+  allPhotos = allPhotos.filter((p) => !excludeSel.has(p.id));
+  excludeMode = false;
+  excludeSel.clear();
+  document.getElementById('exclude-actions').classList.add('hidden');
+  document.getElementById('btn-exclude').textContent = '사진 제외';
+  if (!allPhotos.length) { showToast('모든 사진이 제외되었습니다. 사진을 다시 선택해주세요.'); }
+  recomputeFiltered();
 });
 
 // ---------- 데모 (계정 없이 보기) ----------
@@ -588,7 +617,7 @@ function boot(photos) {
   document.getElementById('demo-links').classList.toggle('hidden', !isDemoMode);
   // 공유 링크는 로그인 사용자만 만들 수 있음 (데모는 토큰이 없어 서버 저장 불가)
   document.getElementById('share-block').classList.toggle('hidden', isDemoMode);
-  withSplash(() => { showSlideshow(); applyPeriod('all'); });
+  withSplash(() => { showSlideshow(); recomputeFiltered(); });
 }
 
 let loggedInName = null;

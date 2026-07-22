@@ -82,7 +82,8 @@ async function startMusic() {
 function stopMusic() { ytPlayer?.pauseVideo(); musicOn = false; updateMusicBtn(); }
 function updateMusicBtn() {
   const b = document.getElementById('btn-music');
-  b.style.opacity = musicOn ? '1' : '0.55';
+  b.classList.toggle('playing', musicOn); // ▷ ↔ ⏸ 아이콘 전환
+  b.style.opacity = musicOn ? '1' : '0.7';
 }
 document.getElementById('btn-music').addEventListener('click', () => (musicOn ? stopMusic() : startMusic()));
 
