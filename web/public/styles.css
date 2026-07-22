@@ -247,7 +247,7 @@ button.preset.active { background: var(--accent-strong); color: #fff; }
   flex: 1; min-width: 0; background: rgba(255,255,255,0.06); border: 1px solid var(--border);
   color: var(--text-main); border-radius: 8px; padding: 9px 11px; font-size: 12.5px;
 }
-.share-url-row .btn-primary { flex: none; padding: 9px 16px; }
+.modal-card .share-url-row .btn-primary { display: flex; align-items: center; justify-content: center; flex: none; width: auto; margin-top: 0; padding: 9px 16px; }
 .share-copied { font-size: 12px; color: #7fdda0; margin: 0 0 8px; }
 .share-modal-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 6px; }
 .modal-card .btn-primary { display: block; width: 100%; margin-top: 6px; }
