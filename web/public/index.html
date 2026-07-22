@@ -131,6 +131,17 @@
         <div id="photo-list-strip" class="thumb-grid"></div>
       </div>
 
+      <div class="share-block" id="share-block">
+        <div class="section-label">공유</div>
+        <button id="btn-make-share" class="secondary slim share-btn">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
+            <line x1="8.6" y1="10.5" x2="15.4" y2="6.5"/><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/>
+          </svg>
+          실시간 공유 링크 만들기
+        </button>
+      </div>
+
       <div class="music-block">
         <div class="section-label">배경음악 (YouTube)</div>
         <div class="music-row">
@@ -183,6 +194,26 @@
         Please send your Gmail address to the administrator. (Admin Email: <b>garzette@paran.com</b>)
       </p>
       <button id="btn-register-close" class="btn-primary">확인</button>
+    </div>
+  </div>
+
+  <!-- 실시간 공유 링크 팝업 -->
+  <div id="share-modal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <h2 style="margin:0 0 6px;">실시간 공유 링크</h2>
+      <p class="modal-block" id="share-modal-desc">
+        아래 링크를 보내면 <b>로그인 없이</b> 사진을 볼 수 있습니다.<br />
+        사진을 다시 선택한 뒤 이 버튼을 다시 누르면 <b>같은 링크</b>에 최신 사진이 반영됩니다.
+      </p>
+      <div class="share-url-row">
+        <input id="share-url" type="text" readonly />
+        <button id="btn-copy-share" class="btn-primary">복사</button>
+      </div>
+      <p id="share-copied" class="share-copied hidden">복사되었습니다.</p>
+      <div class="share-modal-actions">
+        <a href="#" id="btn-open-share" class="text-link small" target="_blank">링크 열어보기</a>
+        <a href="#" id="btn-share-close" class="text-link small">닫기</a>
+      </div>
     </div>
   </div>
 

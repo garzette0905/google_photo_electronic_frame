@@ -14,6 +14,8 @@
  */
 
 const path = require('path');
+const fs = require('fs');
+const crypto = require('crypto');
 const express = require('express');
 const session = require('express-session');
 const FileStore = require('session-file-store')(session);
@@ -32,8 +34,12 @@ const PICKER_BASE = 'https://photospicker.googleapis.com/v1';
 const AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 
+// 공유 링크용 사진 저장 폴더 (public 하위 → /shares/<id>/... 로 정적 서빙)
+const SHARES_DIR = path.join(__dirname, 'public', 'shares');
+fs.mkdirSync(SHARES_DIR, { recursive: true });
+
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: '4mb' })); // 공유 생성 시 사진 목록(메타데이터) 전송 대비
 
 // Render 등은 앞단 프록시(HTTPS 종단)를 통해 요청이 들어온다. 이 설정이 있어야
 // Express가 원 요청을 HTTPS로 인식해 secure 쿠키가 정상 발급된다.
@@ -288,6 +294,83 @@ app.get(
     res.send(buf);
   })
 );
+
+// ---------- 실시간 공유 링크 ----------
+// 로그인한 사용자가 현재 고른 사진을 서버에 실제 파일로 내려받아 저장하고,
+// 로그인 없이 볼 수 있는 공개 링크(/f/<id>)를 만든다. 같은 사용자는 같은 id를
+// 재사용하므로("실시간 공유링크"), 사진을 다시 골라 다시 만들면 같은 링크에 최신 사진이 반영된다.
+
+function baseUrlFromImgPath(imgPath) {
+  // fullUrl 예: "/img?u=<encoded baseUrl>&sz=w1920-h1080" → baseUrl 추출
+  try {
+    const u = new URL(imgPath, 'http://x').searchParams.get('u');
+    if (!u) return null;
+    const host = new URL(u).hostname;
+    if (!/(^|\.)googleusercontent\.com$/.test(host)) return null;
+    return u;
+  } catch { return null; }
+}
+
+async function downloadImage(baseUrl, sz, token) {
+  const r = await fetch(`${baseUrl}=${sz}`, { headers: { Authorization: `Bearer ${token}` } });
+  if (!r.ok) throw new Error(`image fetch ${r.status}`);
+  return Buffer.from(await r.arrayBuffer());
+}
+
+app.post(
+  '/api/share',
+  requireLogin(async (req, res, token) => {
+    const items = Array.isArray(req.body.items) ? req.body.items : [];
+    const musicUrl = typeof req.body.musicUrl === 'string' ? req.body.musicUrl : '';
+    if (!items.length) return res.status(400).json({ error: '공유할 사진이 없습니다.' });
+
+    // 세션마다 고정 공유 id (없으면 생성). 재생성 시 같은 링크에 내용만 갱신.
+    if (!req.session.shareId) req.session.shareId = crypto.randomBytes(9).toString('base64url');
+    const shareId = req.session.shareId;
+
+    const dir = path.join(SHARES_DIR, shareId);
+    fs.rmSync(dir, { recursive: true, force: true }); // 이전 내용 제거 후 최신본으로 교체
+    fs.mkdirSync(path.join(dir, 'photos'), { recursive: true });
+
+    const manifestItems = [];
+    for (let i = 0; i < items.length; i++) {
+      const it = items[i];
+      const base = baseUrlFromImgPath(it.fullUrl || '');
+      if (!base) continue;
+      const n = String(i + 1).padStart(3, '0');
+      try {
+        const full = await downloadImage(base, 'w1920-h1080', token);
+        const thumb = await downloadImage(base, 'w300-h300-c', token);
+        fs.writeFileSync(path.join(dir, 'photos', `${n}_full.jpg`), full);
+        fs.writeFileSync(path.join(dir, 'photos', `${n}_thumb.jpg`), thumb);
+        manifestItems.push({
+          id: it.id, createTime: it.createTime,
+          width: it.width || null, height: it.height || null,
+          fullUrl: `/shares/${shareId}/photos/${n}_full.jpg`,
+          thumbUrl: `/shares/${shareId}/photos/${n}_thumb.jpg`,
+        });
+      } catch { /* 개별 실패는 건너뜀 */ }
+    }
+    if (!manifestItems.length) return res.status(500).json({ error: '사진을 저장하지 못했습니다. 다시 시도해주세요.' });
+
+    manifestItems.sort((a, b) => new Date(a.createTime) - new Date(b.createTime));
+    fs.writeFileSync(
+      path.join(dir, 'photos.json'),
+      JSON.stringify({ musicUrl, items: manifestItems, updatedAt: new Date().toISOString() }, null, 2)
+    );
+    res.json({ url: `${BASE_URL}/f/${shareId}`, count: manifestItems.length });
+  })
+);
+
+// 공개 보기 페이지 (로그인 불필요)
+app.get('/f/:id', (req, res) => {
+  if (!/^[\w-]{6,}$/.test(req.params.id)) return res.status(404).send('잘못된 링크입니다.');
+  const manifest = path.join(SHARES_DIR, req.params.id, 'photos.json');
+  if (!fs.existsSync(manifest)) {
+    return res.status(404).send('공유 사진을 찾을 수 없습니다. 링크가 만료되었거나 삭제되었을 수 있습니다.');
+  }
+  res.sendFile(path.join(__dirname, 'public', 'share.html'));
+});
 
 // ---------- 정적 파일 ----------
 

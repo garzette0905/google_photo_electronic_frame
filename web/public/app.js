@@ -477,6 +477,51 @@ document.getElementById('btn-music-open-yt').addEventListener('click', () => {
   window.open(id ? `https://www.youtube.com/watch?v=${id}` : 'https://www.youtube.com', '_blank');
 });
 
+// ---------- 실시간 공유 링크 ----------
+const shareModal = document.getElementById('share-modal');
+
+document.getElementById('btn-make-share').addEventListener('click', async () => {
+  const btn = document.getElementById('btn-make-share');
+  if (!allPhotos.length) { showToast('공유할 사진이 없습니다.'); return; }
+  const orig = btn.innerHTML;
+  btn.disabled = true;
+  btn.textContent = '사진 저장 중... (사진이 많으면 시간이 걸립니다)';
+  try {
+    const musicUrl = document.getElementById('music-url').value.trim();
+    const items = allPhotos.map((p) => ({
+      id: p.id, createTime: p.createTime, width: p.width, height: p.height, fullUrl: p.fullUrl,
+    }));
+    const r = await api('/api/share', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ items, musicUrl }),
+    });
+    document.getElementById('share-url').value = r.url;
+    document.getElementById('btn-open-share').href = r.url;
+    document.getElementById('share-copied').classList.add('hidden');
+    shareModal.classList.remove('hidden');
+  } catch (err) {
+    showToast('공유 링크 생성 실패: ' + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = orig;
+  }
+});
+
+document.getElementById('btn-copy-share').addEventListener('click', async () => {
+  const input = document.getElementById('share-url');
+  try {
+    await navigator.clipboard.writeText(input.value);
+  } catch {
+    input.select(); document.execCommand('copy'); // 폴백
+  }
+  document.getElementById('share-copied').classList.remove('hidden');
+});
+document.getElementById('btn-share-close').addEventListener('click', (e) => {
+  e.preventDefault(); shareModal.classList.add('hidden');
+});
+shareModal.addEventListener('click', (e) => { if (e.target === shareModal) shareModal.classList.add('hidden'); });
+
 // ---------- 하단 링크 ----------
 document.getElementById('btn-reselect').addEventListener('click', (e) => {
   e.preventDefault();
@@ -541,6 +586,8 @@ function boot(photos) {
   document.getElementById('demo-badge').classList.toggle('hidden', !isDemoMode);
   document.getElementById('account-links').classList.toggle('hidden', isDemoMode);
   document.getElementById('demo-links').classList.toggle('hidden', !isDemoMode);
+  // 공유 링크는 로그인 사용자만 만들 수 있음 (데모는 토큰이 없어 서버 저장 불가)
+  document.getElementById('share-block').classList.toggle('hidden', isDemoMode);
   withSplash(() => { showSlideshow(); applyPeriod('all'); });
 }
 
