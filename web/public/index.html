@@ -65,10 +65,17 @@
 
   <!-- 슬라이드쇼 -->
   <div id="screen-slideshow" class="slideshow hidden">
-    <div class="photo-pane">
+    <div class="photo-pane fx-fade">
       <img class="photo-layer" id="photo-a" />
       <img class="photo-layer" id="photo-b" />
+      <video class="photo-layer" id="video-layer" playsinline muted preload="metadata"></video>
       <div id="demo-badge" class="demo-badge hidden">DEMO — 샘플 사진</div>
+      <div id="title-overlay" class="title-overlay hidden"></div>
+      <div id="ambient-widget" class="ambient-widget hidden">
+        <div id="amb-time" class="amb-time"></div>
+        <div id="amb-date" class="amb-date"></div>
+        <div id="amb-weather" class="amb-weather"></div>
+      </div>
 
       <div class="photo-actions">
         <button id="btn-share" class="icon-btn" title="현재 사진 복사">
@@ -111,6 +118,31 @@
           <label><input type="radio" name="orientation" value="landscape" /> 가로보기</label>
           <label><input type="radio" name="orientation" value="portrait" /> 세로보기</label>
         </div>
+      </div>
+
+      <div class="filter-block">
+        <div class="section-label">재생 설정</div>
+        <div class="setting-row">
+          <span class="setting-label">전환 간격</span>
+          <input type="range" id="interval-range" min="3" max="30" step="1" value="10" />
+          <span id="interval-val" class="setting-val">10초</span>
+        </div>
+        <div class="setting-row">
+          <span class="setting-label">전환 효과</span>
+          <select id="effect-select" class="mini-select">
+            <option value="fade">페이드</option>
+            <option value="slide">슬라이드</option>
+            <option value="kenburns">켄번즈(줌·팬)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="filter-block">
+        <div class="section-label">화면 표시</div>
+        <div class="setting-row">
+          <input type="text" id="title-input" class="title-input" placeholder="슬라이드쇼 제목 (좌측 상단 표시)" maxlength="40" />
+        </div>
+        <label class="check-row"><input type="checkbox" id="ambient-toggle" checked /> 시계·날씨 표시</label>
       </div>
 
       <div class="photo-list-block">

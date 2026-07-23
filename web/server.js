@@ -256,14 +256,21 @@ app.get(
         const base = it.mediaFile?.baseUrl;
         if (!base) return;
         const meta = it.mediaFile?.mediaFileMetadata || {};
-        items.push({
+        // 동영상 여부: Picker의 type(VIDEO) 또는 mimeType(video/*)로 판별.
+        const isVideo = it.type === 'VIDEO' || /^video\//.test(it.mediaFile?.mimeType || '');
+        const item = {
           id: it.id,
           createTime: it.createTime,
+          type: isVideo ? 'video' : 'photo',
           width: Number(meta.width) || null,
           height: Number(meta.height) || null,
+          // 동영상도 baseUrl에 크기 파라미터를 붙이면 정지 프레임(포스터) 이미지를 준다.
           fullUrl: `/img?u=${encodeURIComponent(base)}&sz=w1920-h1080`,
           thumbUrl: `/img?u=${encodeURIComponent(base)}&sz=w300-h300-c`,
-        });
+        };
+        // 실제 동영상 재생은 baseUrl에 '=dv'가 필요하며 인증이 걸려 있어 /video 프록시로 받는다.
+        if (isVideo) item.videoUrl = `/video?u=${encodeURIComponent(base)}`;
+        items.push(item);
       });
       pageToken = data.nextPageToken;
     } while (pageToken);
@@ -289,6 +296,35 @@ app.get(
     const r = await fetch(`${u}=${sz}`, { headers: { Authorization: `Bearer ${token}` } });
     if (!r.ok) return res.status(r.status).send('image fetch failed');
     res.set('Content-Type', r.headers.get('content-type') || 'image/jpeg');
+    res.set('Cache-Control', 'private, max-age=3000');
+    const buf = Buffer.from(await r.arrayBuffer());
+    res.send(buf);
+  })
+);
+
+// 동영상 프록시: 인증이 필요한 '=dv'(원본 동영상) 다운로드를 서버가 대신 받아 전달.
+// 브라우저의 Range 요청(탐색·부분 재생)을 그대로 구글로 전달하고 응답 상태·헤더를 넘겨준다.
+// /img와 마찬가지로 구글 사용자 콘텐츠 호스트만 허용해 오픈 프록시가 되지 않게 한다.
+app.get(
+  '/video',
+  requireLogin(async (req, res, token) => {
+    const u = req.query.u;
+    if (!u) return res.status(400).send('missing url');
+    let host;
+    try { host = new URL(u).hostname; } catch { return res.status(400).send('bad url'); }
+    if (!/(^|\.)googleusercontent\.com$/.test(host)) return res.status(403).send('forbidden host');
+
+    const headers = { Authorization: `Bearer ${token}` };
+    if (req.headers.range) headers.Range = req.headers.range;
+    const r = await fetch(`${u}=dv`, { headers });
+    if (!r.ok && r.status !== 206) return res.status(r.status).send('video fetch failed');
+
+    res.status(r.status);
+    ['content-type', 'content-length', 'content-range', 'accept-ranges'].forEach((h) => {
+      const v = r.headers.get(h);
+      if (v) res.set(h, v);
+    });
+    if (!r.headers.get('accept-ranges')) res.set('Accept-Ranges', 'bytes');
     res.set('Cache-Control', 'private, max-age=3000');
     const buf = Buffer.from(await r.arrayBuffer());
     res.send(buf);
