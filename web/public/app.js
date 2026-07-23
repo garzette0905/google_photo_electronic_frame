@@ -487,8 +487,8 @@ async function loadBgMusic(url) {
           onReady: (e) => { e.target.playVideo(); resolve(); },
           onStateChange: (e) => {
             // 재생/일시정지 버튼을 하나로 통합: 재생 중이면 일시정지, 아니면 재생하기
-            if (e.data === YT.PlayerState.PLAYING) { playBtn.textContent = '⏸ 일시정지'; musicPlaying = true; }
-            else if (e.data === YT.PlayerState.PAUSED) { playBtn.textContent = '▶ 재생하기'; musicPlaying = false; }
+            if (e.data === YT.PlayerState.PLAYING) { playBtn.textContent = '⏸'; musicPlaying = true; }
+            else if (e.data === YT.PlayerState.PAUSED) { playBtn.textContent = '▶'; musicPlaying = false; }
             refreshCaption();
           },
           onError: () => showToast('이 영상은 재생할 수 없습니다 (퍼가기 금지 등).'),
@@ -501,7 +501,7 @@ async function loadBgMusic(url) {
   musicLoaded = true;
   musicPlaying = true;
   musicTitle = '';
-  playBtn.textContent = '⏸ 일시정지';
+  playBtn.textContent = '⏸';
   setTimeout(() => {
     try { musicTitle = ytPlayer.getVideoData()?.title || ''; titleEl.textContent = musicTitle; refreshCaption(); } catch {}
   }, 900);
@@ -523,12 +523,6 @@ document.getElementById('btn-music-load').addEventListener('click', () => {
 document.getElementById('music-volume').addEventListener('input', (e) => ytPlayer?.setVolume(Number(e.target.value)));
 document.getElementById('btn-music-clear').addEventListener('click', () => {
   const i = document.getElementById('music-url'); i.value = ''; i.focus();
-});
-document.getElementById('btn-music-open-yt').addEventListener('click', () => {
-  setSlideshowPaused(true);
-  const url = document.getElementById('music-url').value.trim();
-  const id = url ? extractYouTubeId(url) : null;
-  window.open(id ? `https://www.youtube.com/watch?v=${id}` : 'https://www.youtube.com', '_blank');
 });
 
 // ---------- 실시간 공유 링크 ----------
@@ -668,7 +662,6 @@ function lsSet(key, val) { try { localStorage.setItem(key, val); } catch {} }
 
 function applyInterval(sec) {
   slideIntervalMs = sec * 1000;
-  document.getElementById('interval-val').textContent = sec + '초';
   // Ken Burns 애니메이션 길이를 전환 간격과 맞춰 표시되는 동안 천천히 줌되게 한다.
   photoPane.style.setProperty('--kb-duration', sec + 's');
   lsSet('slideIntervalSec', String(sec));
@@ -756,13 +749,20 @@ function applyAmbient(on) {
   else { stopClock(); }
 }
 
+const INTERVAL_OPTIONS = [3, 5, 7, 10, 15, 20, 30];
 function loadDisplaySettings() {
-  const sec = parseInt(lsGet('slideIntervalSec', '10'), 10) || 10;
-  document.getElementById('interval-range').value = sec;
+  let sec = parseInt(lsGet('slideIntervalSec', '10'), 10) || 10;
+  // 저장값이 리스트에 없으면 가장 가까운 옵션으로 맞춘다 (이전 슬라이더 값 호환).
+  if (!INTERVAL_OPTIONS.includes(sec)) {
+    sec = INTERVAL_OPTIONS.reduce((a, b) => (Math.abs(b - sec) < Math.abs(a - sec) ? b : a), 10);
+  }
+  document.getElementById('interval-select').value = String(sec);
   applyInterval(sec);
   const eff = lsGet('slideEffect', 'fade');
-  document.getElementById('effect-select').value = eff;
-  applyEffect(eff);
+  const effRadio = document.querySelector(`#effect-radios input[value="${eff}"]`) ||
+                   document.querySelector('#effect-radios input[value="fade"]');
+  effRadio.checked = true;
+  applyEffect(effRadio.value);
   const title = lsGet('slideTitle', '');
   document.getElementById('title-input').value = title;
   applyTitle(title);
@@ -772,8 +772,10 @@ function loadDisplaySettings() {
 }
 
 // 설정 컨트롤 이벤트 (모듈 로드 시 1회 등록)
-document.getElementById('interval-range').addEventListener('input', (e) => applyInterval(parseInt(e.target.value, 10)));
-document.getElementById('effect-select').addEventListener('change', (e) => applyEffect(e.target.value));
+document.getElementById('interval-select').addEventListener('change', (e) => applyInterval(parseInt(e.target.value, 10)));
+document.querySelectorAll('#effect-radios input').forEach((r) =>
+  r.addEventListener('change', () => { if (r.checked) applyEffect(r.value); })
+);
 document.getElementById('title-input').addEventListener('input', (e) => applyTitle(e.target.value));
 document.getElementById('ambient-toggle').addEventListener('change', (e) => applyAmbient(e.target.checked));
 

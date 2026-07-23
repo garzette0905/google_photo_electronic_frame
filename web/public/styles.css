@@ -155,8 +155,10 @@ body.fullscreen .fullscreen-caption { display: block; }
 
 .info-pane {
   flex: 0 0 312px; width: 312px; background: var(--bg-panel); padding: 26px 22px 16px;
-  display: flex; flex-direction: column; gap: 20px; border-left: 1px solid var(--border); overflow: hidden;
+  display: flex; flex-direction: column; gap: 20px; border-left: 1px solid var(--border); overflow-y: auto;
 }
+.info-pane::-webkit-scrollbar { width: 6px; }
+.info-pane::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 3px; }
 .date-main { font-size: 22px; font-weight: 700; }
 .date-sub { font-size: 13px; color: var(--text-muted); margin-top: 3px; }
 .section-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1.2px; margin-bottom: 8px; }
@@ -176,8 +178,8 @@ button.preset.active { background: var(--accent-strong); color: #fff; }
 .radio-row label { display: flex; align-items: center; gap: 4px; font-size: 12.5px; color: var(--text-main); cursor: pointer; }
 .radio-row input[type="radio"] { accent-color: var(--accent-strong); cursor: pointer; }
 
-.photo-list-block { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
-.thumb-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; overflow-y: auto; align-content: start; padding-right: 2px; }
+.photo-list-block { flex: none; display: flex; flex-direction: column; }
+.thumb-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; overflow-y: auto; align-content: start; padding-right: 2px; max-height: 34vh; }
 .thumb-grid::-webkit-scrollbar { width: 6px; }
 .thumb-grid::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 3px; }
 .thumb-cell { position: relative; cursor: pointer; }
@@ -208,7 +210,6 @@ button.preset.active { background: var(--accent-strong); color: #fff; }
 .music-row input[type="range"] { flex: 1; accent-color: var(--accent-strong); }
 .mini-btn { flex: none; width: 30px; height: 30px; padding: 0; border-radius: 8px; background: rgba(255,255,255,0.08); color: var(--text-muted); font-size: 12px; line-height: 1; }
 .mini-btn:hover { color: var(--text-main); filter: none; background: rgba(255,255,255,0.14); }
-.yt-btn { display: flex; align-items: center; justify-content: center; gap: 6px; }
 .music-title { font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .yt-host { position: absolute; width: 1px; height: 1px; overflow: hidden; opacity: 0.01; pointer-events: none; left: -9999px; }
 

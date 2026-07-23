@@ -124,16 +124,23 @@
         <div class="section-label">재생 설정</div>
         <div class="setting-row">
           <span class="setting-label">전환 간격</span>
-          <input type="range" id="interval-range" min="3" max="30" step="1" value="10" />
-          <span id="interval-val" class="setting-val">10초</span>
+          <select id="interval-select" class="mini-select">
+            <option value="3">3초</option>
+            <option value="5">5초</option>
+            <option value="7">7초</option>
+            <option value="10">10초</option>
+            <option value="15">15초</option>
+            <option value="20">20초</option>
+            <option value="30">30초</option>
+          </select>
         </div>
         <div class="setting-row">
           <span class="setting-label">전환 효과</span>
-          <select id="effect-select" class="mini-select">
-            <option value="fade">페이드</option>
-            <option value="slide">슬라이드</option>
-            <option value="kenburns">켄번즈(줌·팬)</option>
-          </select>
+          <div id="effect-radios" class="radio-row">
+            <label><input type="radio" name="effect" value="fade" /> 페이드</label>
+            <label><input type="radio" name="effect" value="slide" /> 슬라이드</label>
+            <label><input type="radio" name="effect" value="kenburns" /> 켄번즈</label>
+          </div>
         </div>
       </div>
 
@@ -165,16 +172,7 @@
         <div class="music-row">
           <input type="text" id="music-url" placeholder="YouTube 링크 붙여넣기" />
           <button id="btn-music-clear" class="mini-btn" title="입력 지우기">✕</button>
-        </div>
-        <div class="music-row">
-          <button id="btn-music-open-yt" class="secondary slim yt-btn" title="YouTube 열기">
-            <svg viewBox="0 0 28 20" width="20" height="14">
-              <rect x="0" y="0" width="28" height="20" rx="4.5" fill="#FF0000"/>
-              <polygon points="11,5 20,10 11,15" fill="#fff"/>
-            </svg>
-            Youtube연결
-          </button>
-          <button id="btn-music-load" class="secondary slim">▶ 재생하기</button>
+          <button id="btn-music-load" class="mini-btn" title="재생 / 일시정지">▶</button>
         </div>
         <div class="music-row">
           <input type="range" id="music-volume" min="0" max="100" value="60" />
