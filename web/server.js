@@ -358,6 +358,10 @@ app.post(
   requireLogin(async (req, res, token) => {
     const items = Array.isArray(req.body.items) ? req.body.items : [];
     const musicUrl = typeof req.body.musicUrl === 'string' ? req.body.musicUrl : '';
+    // 공유 화면에도 동일하게 적용할 제목·전환 간격·전환 효과 (값이 없거나 이상하면 기본값).
+    const title = typeof req.body.title === 'string' ? req.body.title.slice(0, 40) : '';
+    const intervalSec = Math.min(60, Math.max(3, Number(req.body.intervalSec) || 10));
+    const effect = ['fade', 'slide', 'kenburns'].includes(req.body.effect) ? req.body.effect : 'fade';
     if (!items.length) return res.status(400).json({ error: '공유할 사진이 없습니다.' });
 
     // 세션마다 고정 공유 id (없으면 생성). 재생성 시 같은 링크에 내용만 갱신.
@@ -392,7 +396,7 @@ app.post(
     manifestItems.sort((a, b) => new Date(a.createTime) - new Date(b.createTime));
     fs.writeFileSync(
       path.join(dir, 'photos.json'),
-      JSON.stringify({ musicUrl, items: manifestItems, updatedAt: new Date().toISOString() }, null, 2)
+      JSON.stringify({ musicUrl, title, intervalSec, effect, items: manifestItems, updatedAt: new Date().toISOString() }, null, 2)
     );
     res.json({ url: `${BASE_URL}/f/${shareId}`, count: manifestItems.length });
   })

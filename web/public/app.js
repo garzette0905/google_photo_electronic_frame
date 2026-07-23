@@ -542,10 +542,13 @@ document.getElementById('btn-make-share').addEventListener('click', async () => 
     const items = sharePhotos.map((p) => ({
       id: p.id, createTime: p.createTime, width: p.width, height: p.height, fullUrl: p.fullUrl,
     }));
+    // 공유 링크를 만드는 시점의 제목·전환 간격·전환 효과를 함께 저장해 공유 화면에도 동일 적용.
+    const title = document.getElementById('title-input').value.trim();
+    const intervalSec = Math.round(slideIntervalMs / 1000);
     const r = await api('/api/share', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ items, musicUrl }),
+      body: JSON.stringify({ items, musicUrl, title, intervalSec, effect: slideEffect }),
     });
     document.getElementById('share-url').value = r.url;
     document.getElementById('btn-open-share').href = r.url;

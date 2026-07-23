@@ -5,6 +5,7 @@ let photos = [];
 let idx = 0;
 let activeLayer = 'a';
 let timer = null;
+let intervalMs = 10000; // 링크 생성 시점의 전환 간격 (없으면 10초)
 
 function formatDate(iso) {
   const d = new Date(iso);
@@ -33,7 +34,7 @@ async function show() {
 }
 
 function advance() { if (photos.length) { idx = (idx + 1) % photos.length; show(); } }
-function resetTimer() { if (timer) clearInterval(timer); timer = setInterval(advance, 10000); }
+function resetTimer() { if (timer) clearInterval(timer); timer = setInterval(advance, intervalMs); }
 
 // ---- 전체화면 ----
 function setFullscreen(on) {
@@ -102,6 +103,20 @@ async function init() {
     photos = data.items || [];
     musicUrl = data.musicUrl || '';
     if (!photos.length) throw new Error();
+
+    // 링크 생성 시점에 선택했던 제목·전환 간격·전환 효과 적용
+    const view = document.querySelector('.share-view');
+    const title = (data.title || '').trim();
+    if (title) {
+      const t = document.getElementById('share-title');
+      t.textContent = title;
+      t.classList.remove('hidden');
+    }
+    const effect = ['fade', 'slide', 'kenburns'].includes(data.effect) ? data.effect : 'fade';
+    view.classList.add('fx-' + effect);
+    const sec = Math.min(60, Math.max(3, Number(data.intervalSec) || 10));
+    intervalMs = sec * 1000;
+    view.style.setProperty('--kb-duration', sec + 's');
   } catch {
     document.getElementById('share-loading').classList.add('hidden');
     const e = document.getElementById('share-error');

@@ -234,9 +234,12 @@ button.preset.active { background: var(--accent-strong); color: #fff; }
 body.has-title .demo-badge { top: 50px; }
 
 /* ---------- 제목 · 시계/날씨 오버레이 (전체화면에서도 표시) ---------- */
+/* 제목과 시계 시각의 폰트 크기를 하나의 변수로 묶어 항상 같은 크기로 유지한다. */
+:root { --overlay-size: 21px; }
 .title-overlay {
-  position: absolute; left: 18px; top: 16px; z-index: 6; max-width: 62%;
-  font-size: 20px; font-weight: 700; color: #fff; letter-spacing: 0.3px;
+  position: absolute; left: 18px; top: 14px; z-index: 6; max-width: 62%;
+  font-family: 'Dancing Script', 'Nanum Pen Script', cursive;
+  font-size: var(--overlay-size); font-weight: 600; color: #fff;
   text-shadow: 0 2px 8px rgba(0, 0, 0, 0.75); pointer-events: none;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
@@ -245,7 +248,7 @@ body.has-title .demo-badge { top: 50px; }
   color: #fff; line-height: 1.15; text-shadow: 0 2px 8px rgba(0, 0, 0, 0.78);
   pointer-events: none;
 }
-.amb-time { font-size: 26px; font-weight: 700; letter-spacing: 0.5px; }
+.amb-time { font-size: var(--overlay-size); font-weight: 700; letter-spacing: 0.5px; }
 .amb-date { font-size: 12.5px; opacity: 0.9; }
 .amb-weather { font-size: 13px; opacity: 0.95; margin-top: 2px; }
 
