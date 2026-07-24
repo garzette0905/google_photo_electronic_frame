@@ -2,3 +2,6 @@ node_modules/
 dist/
 web/sessions/
 web/public/shares/
+
+# Claude Code 로컬 설정 (개인/머신 전용)
+.claude/
