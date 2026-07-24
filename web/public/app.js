@@ -246,6 +246,7 @@ function stopVideo() {
   if (!v) return;
   try { v.pause(); } catch {}
   v.onended = null;
+  v.onerror = null;
   if (v.getAttribute('src')) { v.removeAttribute('src'); try { v.load(); } catch {} }
   v.classList.remove('active');
 }
@@ -276,6 +277,11 @@ async function showCurrent() {
     video.classList.add('active');
     if (intervalHandle) { clearInterval(intervalHandle); intervalHandle = null; }
     video.onended = () => { if (!slideshowPaused) advance(); };
+    // 재생 불가(코덱 미지원·손상 등)로 onended가 안 오면 슬라이드쇼가 멈추므로,
+    // 오류 시 잠시 뒤 다음 항목으로 넘어가 정지되지 않게 한다.
+    video.onerror = () => {
+      setTimeout(() => { if (!slideshowPaused && filteredPhotos[currentIndex] === photo) advance(); }, 1500);
+    };
     if (!slideshowPaused) video.play().catch(() => {});
     updateMeta(photo);
     return;
@@ -625,6 +631,7 @@ document.getElementById('btn-exclude-apply').addEventListener('click', () => {
 
 // ---------- 데모 (계정 없이 보기) ----------
 let isDemoMode = false;
+let isSharedMode = false; // 구글 포토 "공유"로 사진을 받아 로그인 없이 보는 상태(PWA 공유 타깃)
 
 async function startDemo() {
   try {
@@ -790,27 +797,75 @@ function boot(photos) {
   orientationMode = 'all';
   const allRadio = document.querySelector('#orientation-radios input[value="all"]');
   if (allRadio) allRadio.checked = true;
-  if (!isDemoMode) {
+  // 데모·공유 유입은 로그인 없이 보는 "게스트" 상태
+  const guest = isDemoMode || isSharedMode;
+  if (!guest) {
     // 이전에 직접 설정한 곡이 있으면 그것을, 없으면 기본 곡을 채운다.
     const saved = (() => { try { return localStorage.getItem('bgMusicUrl'); } catch { return null; } })();
     document.getElementById('music-url').value = saved || DEFAULT_MUSIC_URL;
   }
   document.getElementById('demo-badge').classList.toggle('hidden', !isDemoMode);
-  document.getElementById('account-links').classList.toggle('hidden', isDemoMode);
-  document.getElementById('demo-links').classList.toggle('hidden', !isDemoMode);
-  // 공유 링크는 로그인 사용자만 만들 수 있음 (데모는 토큰이 없어 서버 저장 불가)
-  document.getElementById('share-block').classList.toggle('hidden', isDemoMode);
+  document.getElementById('account-links').classList.toggle('hidden', guest);
+  document.getElementById('demo-links').classList.toggle('hidden', !guest);
+  // 공유 링크·사진 재선택 등은 로그인 사용자만 (게스트는 토큰이 없어 불가)
+  document.getElementById('share-block').classList.toggle('hidden', guest);
   loadDisplaySettings();
   withSplash(() => { showSlideshow(); recomputeFiltered(); });
 }
 
 let loggedInName = null;
 
+// ---------- PWA: 공유 타깃으로 받은 사진 읽어오기 ----------
+// 구글 포토 "공유" → 서비스워커가 파일을 Cache에 저장 → /?shared=1 로 이동.
+// 여기서 그 파일들을 꺼내 슬라이드쇼 항목(오브젝트 URL)으로 만든다.
+async function loadSharedMedia() {
+  if (!('caches' in window)) return null;
+  const cache = await caches.open('shared-media-v1');
+  const metaRes = await cache.match('/shared-media/manifest');
+  if (!metaRes) return null;
+  const meta = await metaRes.json();
+  const items = [];
+  for (const m of meta) {
+    const res = await cache.match(m.key);
+    if (!res) continue;
+    const blob = await res.blob();
+    const objUrl = URL.createObjectURL(blob);
+    const type = m.type === 'video' ? 'video' : 'photo';
+    const it = {
+      id: m.key,
+      type,
+      createTime: new Date(m.lastModified || Date.now()).toISOString(),
+      width: null, height: null,
+      fullUrl: objUrl, thumbUrl: objUrl,
+    };
+    if (type === 'video') it.videoUrl = objUrl;
+    items.push(it);
+  }
+  // 파일 수정시각(촬영시각 근사) 오름차순 — 앱 전반 정렬 규칙과 동일
+  items.sort((a, b) => new Date(a.createTime) - new Date(b.createTime));
+  return items;
+}
+
 async function init() {
+  const params = new URLSearchParams(location.search);
+  if (params.has('shared')) {
+    // 새로고침 시 재유입/혼선을 막기 위해 주소를 정리
+    history.replaceState(null, '', '/');
+    let shared = null;
+    try { shared = await loadSharedMedia(); } catch { /* 무시하고 일반 흐름으로 */ }
+    if (shared && shared.length) { isSharedMode = true; boot(shared); return; }
+    if (params.get('shared') === 'empty') showToast('공유된 사진을 찾지 못했습니다.');
+    // 공유 데이터가 없으면 아래 일반 흐름(로그인/로그인화면)으로 계속 진행
+  }
   const status = await api('/api/status').catch(() => ({ loggedIn: false }));
   if (!status.loggedIn) { withSplash(showLogin); return; }
   loggedInName = status.name || status.email || null;
   withSplash(startPickerFlow);
+}
+
+// PWA 서비스워커 등록 (공유 타깃 수신용). 실패해도 앱 기능에는 영향 없음.
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
 }
 
 init();

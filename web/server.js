@@ -412,6 +412,10 @@ app.get('/f/:id', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'share.html'));
 });
 
+// PWA 공유 타깃 폴백: 정상적으로는 서비스워커(sw.js)가 이 POST를 가로채 처리한다.
+// 서비스워커가 아직 활성화/제어 전인 드문 경우에도 에러 대신 홈으로 부드럽게 보낸다.
+app.post('/share-target', (req, res) => res.redirect('/'));
+
 // ---------- 정적 파일 ----------
 
 app.use(express.static(path.join(__dirname, 'public')));
