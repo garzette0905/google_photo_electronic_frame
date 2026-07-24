@@ -160,6 +160,8 @@ const excludeSel = new Set(); // 제외로 체크된 사진 id
 // 재생/표시 설정 (localStorage에 저장)
 let slideIntervalMs = 10000; // 전환 간격
 let slideEffect = 'fade';    // 'fade' | 'slide' | 'kenburns'
+let videoSoundOn = true;     // 동영상 소리 재생(재생 중 배경음악 정지) 여부
+let musicPausedForVideo = false; // 동영상 재생을 위해 배경음악을 우리가 일시정지했는지
 const photoPane = document.querySelector('.photo-pane');
 
 function formatDate(iso) {
@@ -272,7 +274,12 @@ async function showCurrent() {
     document.getElementById('photo-a').classList.remove('active');
     document.getElementById('photo-b').classList.remove('active');
     video.poster = photo.fullUrl;
-    video.muted = true;
+    if (videoSoundOn) {
+      video.muted = false;
+      pauseMusicForVideo(); // 소리 있는 동영상 재생 동안 배경음악 정지
+    } else {
+      video.muted = true;   // 옵션 꺼짐: 음소거로 재생(배경음악 유지)
+    }
     video.src = photo.videoUrl;
     video.classList.add('active');
     if (intervalHandle) { clearInterval(intervalHandle); intervalHandle = null; }
@@ -282,13 +289,19 @@ async function showCurrent() {
     video.onerror = () => {
       setTimeout(() => { if (!slideshowPaused && filteredPhotos[currentIndex] === photo) advance(); }, 1500);
     };
-    if (!slideshowPaused) video.play().catch(() => {});
+    if (!slideshowPaused) {
+      video.play().catch(() => {
+        // 소리 있는 자동재생이 브라우저에 막히면 음소거로 폴백하고 배경음악은 복귀시킨다.
+        if (videoSoundOn) { video.muted = true; resumeMusicAfterVideo(); video.play().catch(() => {}); }
+      });
+    }
     updateMeta(photo);
     return;
   }
 
   // 사진: 기존 두 레이어 크로스페이드
   stopVideo();
+  resumeMusicAfterVideo(); // 동영상 → 사진 전환 시 정지했던 배경음악 복귀
   const nextLayer = document.getElementById(activeLayer === 'a' ? 'photo-b' : 'photo-a');
   const prevLayer = document.getElementById(activeLayer === 'a' ? 'photo-a' : 'photo-b');
   await preload(photo.fullUrl);
@@ -692,6 +705,39 @@ function applyTitle(text) {
   lsSet('slideTitle', text);
 }
 
+// 배경음악을 "동영상 재생용"으로 잠시 정지 (재생 중일 때만). 나중에 복귀할 수 있게 표시.
+function pauseMusicForVideo() {
+  if (musicPlaying && ytPlayer) {
+    try { ytPlayer.pauseVideo(); } catch {}
+    musicPausedForVideo = true;
+  }
+}
+// 동영상 때문에 정지했던 배경음악을 다시 재생.
+function resumeMusicAfterVideo() {
+  if (musicPausedForVideo && ytPlayer) {
+    try { ytPlayer.playVideo(); } catch {}
+  }
+  musicPausedForVideo = false;
+}
+
+function applyVideoSound(on) {
+  videoSoundOn = on;
+  lsSet('videoSoundOn', on ? '1' : '0');
+  // 현재 동영상이 재생 중이면 즉시 반영
+  const cur = filteredPhotos[currentIndex];
+  const v = document.getElementById('video-layer');
+  if (cur && cur.type === 'video' && v.classList.contains('active')) {
+    if (on) {
+      v.muted = false;
+      pauseMusicForVideo();
+      v.play().catch(() => { v.muted = true; resumeMusicAfterVideo(); v.play().catch(() => {}); });
+    } else {
+      v.muted = true;
+      resumeMusicAfterVideo();
+    }
+  }
+}
+
 // ---------- 시계 · 날씨 위젯 ----------
 let clockTimer = null;
 let weatherTimer = null;
@@ -779,6 +825,9 @@ function loadDisplaySettings() {
   const amb = lsGet('ambientOn', '1') !== '0';
   document.getElementById('ambient-toggle').checked = amb;
   applyAmbient(amb);
+  const vsound = lsGet('videoSoundOn', '1') !== '0'; // 기본 ON
+  document.getElementById('video-sound-toggle').checked = vsound;
+  applyVideoSound(vsound);
 }
 
 // 설정 컨트롤 이벤트 (모듈 로드 시 1회 등록)
@@ -788,6 +837,7 @@ document.querySelectorAll('#effect-radios input').forEach((r) =>
 );
 document.getElementById('title-input').addEventListener('input', (e) => applyTitle(e.target.value));
 document.getElementById('ambient-toggle').addEventListener('change', (e) => applyAmbient(e.target.checked));
+document.getElementById('video-sound-toggle').addEventListener('change', (e) => applyVideoSound(e.target.checked));
 
 // ---------- 부팅 ----------
 function boot(photos) {
