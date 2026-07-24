@@ -30,7 +30,29 @@ async function show() {
   next.classList.add('active');
   prev.classList.remove('active');
   activeLayer = activeLayer === 'a' ? 'b' : 'a';
-  document.getElementById('share-caption').textContent = formatDate(p.createTime);
+  renderCaption();
+  updateProgress();
+}
+
+// 캡션: 우측 하단에 날짜(시계 자리) + 그 아래 곡목(♪). 소리 여부와 무관하게 곡목을 표시한다.
+function renderCaption() {
+  const p = photos[idx];
+  const el = document.getElementById('share-caption');
+  el.textContent = '';
+  const lines = [];
+  if (p) lines.push(formatDate(p.createTime));
+  if (musicTitle) lines.push('♪ ' + musicTitle);
+  lines.forEach((ln, i) => {
+    if (i > 0) el.appendChild(document.createElement('br'));
+    el.appendChild(document.createTextNode(ln));
+  });
+}
+
+// 하단 진행바: 현재 사진이 전체에서 몇 번째인지 (희미한 참고용)
+function updateProgress() {
+  const fill = document.getElementById('progress-strip-fill');
+  if (!fill) return;
+  fill.style.width = (photos.length ? ((idx + 1) / photos.length) * 100 : 0) + '%';
 }
 
 function advance() { if (photos.length) { idx = (idx + 1) % photos.length; show(); } }
@@ -48,7 +70,8 @@ document.addEventListener('fullscreenchange', () =>
   document.body.classList.toggle('fullscreen', !!document.fullscreenElement));
 
 // ---- 배경음악 (선택) ----
-let ytPlayer = null, ytReady = null, musicOn = false, musicUrl = '';
+// 기본은 "무음": 음소거 자동재생으로 곡 제목만 얻어 캡션에 표시하고, ▶ 버튼을 눌러야 소리가 난다.
+let ytPlayer = null, ytReady = null, soundOn = false, musicUrl = '', musicTitle = '';
 function loadYouTubeApi() {
   if (ytReady) return ytReady;
   ytReady = new Promise((resolve) => {
@@ -64,33 +87,48 @@ function ytId(url) {
   for (const re of pats) { const m = url.match(re); if (m) return m[1]; }
   return null;
 }
-async function startMusic() {
+// 무음으로 플레이어를 만들어(음소거 자동재생) 곡 제목을 얻고 캡션에 표시한다. 소리는 나지 않는다.
+async function initMusic() {
   const id = musicUrl ? ytId(musicUrl) : null;
   if (!id) return;
   await loadYouTubeApi();
-  if (!ytPlayer) {
-    await new Promise((resolve) => {
-      ytPlayer = new YT.Player('yt-player', {
-        videoId: id,
-        playerVars: { autoplay: 1, loop: 1, playlist: id, controls: 0 },
-        events: { onReady: (e) => { e.target.playVideo(); resolve(); } },
-      });
+  await new Promise((resolve) => {
+    ytPlayer = new YT.Player('yt-player', {
+      videoId: id,
+      playerVars: { autoplay: 1, mute: 1, loop: 1, playlist: id, controls: 0 },
+      events: { onReady: (e) => { try { e.target.mute(); e.target.playVideo(); } catch {} resolve(); } },
     });
-  } else ytPlayer.playVideo();
-  musicOn = true;
+  });
+  // 제목 읽기 (소리와 무관). 메타데이터 로딩 지연 대비 두 번 시도.
+  const readTitle = () => { try { musicTitle = ytPlayer.getVideoData()?.title || musicTitle; renderCaption(); } catch {} };
+  setTimeout(readTitle, 900);
+  setTimeout(readTitle, 2500);
+  document.getElementById('btn-music').style.display = 'flex';
   updateMusicBtn();
 }
-function stopMusic() { ytPlayer?.pauseVideo(); musicOn = false; updateMusicBtn(); }
+function playSound() {
+  if (!ytPlayer) return;
+  try { ytPlayer.unMute(); ytPlayer.setVolume(80); ytPlayer.playVideo(); } catch {}
+  soundOn = true;
+  updateMusicBtn();
+}
+function muteSound() {
+  if (!ytPlayer) return;
+  try { ytPlayer.mute(); } catch {} // 계속 무음으로 재생(곡목 유지), 소리만 끔
+  soundOn = false;
+  updateMusicBtn();
+}
 function updateMusicBtn() {
   const b = document.getElementById('btn-music');
-  b.classList.toggle('playing', musicOn); // ▷ ↔ ⏸ 아이콘 전환
-  b.style.opacity = musicOn ? '1' : '0.7';
+  b.classList.toggle('playing', soundOn); // ▷(무음) ↔ ⏸(소리 켜짐)
+  b.style.opacity = soundOn ? '1' : '0.7';
+  b.title = soundOn ? '소리 끄기' : '소리 켜기';
 }
-document.getElementById('btn-music').addEventListener('click', () => (musicOn ? stopMusic() : startMusic()));
+document.getElementById('btn-music').addEventListener('click', () => (soundOn ? muteSound() : playSound()));
 
 // ---- 홈으로 이동 ----
 document.getElementById('btn-home').addEventListener('click', () => {
-  stopMusic();
+  try { ytPlayer?.pauseVideo(); } catch {}
   location.href = '/';
 });
 
@@ -130,16 +168,7 @@ async function init() {
   await show();
   resetTimer();
 
-  // 음악이 있으면: 브라우저가 소리 자동재생을 막으므로 "탭하여 시작" 안내를 띄운다.
-  if (musicUrl) {
-    document.getElementById('btn-music').style.display = 'flex';
-    const hint = document.getElementById('tap-hint');
-    hint.classList.remove('hidden');
-    hint.addEventListener('click', () => {
-      hint.classList.add('hidden');
-      startMusic();
-      setFullscreen(true);
-    }, { once: true });
-  }
+  // 음악이 있으면 무음으로 시작해 곡목만 표시(소리는 ▶ 버튼으로). 자동으로 소리 내지 않음.
+  if (musicUrl) initMusic();
 }
 init();

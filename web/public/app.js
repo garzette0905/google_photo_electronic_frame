@@ -268,6 +268,16 @@ function updateMeta(photo) {
   document.getElementById('cur-date-sub').textContent = sub;
   updateFullscreenCaption(photo);
   updateActiveThumb();
+  updateProgress();
+}
+
+// 하단 진행바: 현재 사진이 전체에서 몇 번째인지 (희미한 참고용)
+function updateProgress() {
+  const fill = document.getElementById('progress-strip-fill');
+  if (!fill) return;
+  const total = filteredPhotos.length;
+  const pct = total ? ((currentIndex + 1) / total) * 100 : 0;
+  fill.style.width = pct + '%';
 }
 
 async function showCurrent() {

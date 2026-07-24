@@ -147,6 +147,16 @@ body.fullscreen .info-pane { display: none; }
 }
 body.fullscreen .fullscreen-caption { display: block; }
 
+/* 하단 진행바 (현재 사진 / 전체) — 아주 희미하게, 참고용. 메인·공유 화면 공용 */
+.progress-strip {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 3px;
+  background: rgba(255, 255, 255, 0.06); z-index: 6; pointer-events: none;
+}
+.progress-strip-fill {
+  height: 100%; width: 0; background: rgba(255, 255, 255, 0.28);
+  transition: width 0.5s ease;
+}
+
 .toast {
   position: absolute; left: 50%; bottom: 28px; transform: translateX(-50%);
   background: rgba(0,0,0,0.72); color: #fff; font-size: 13px; padding: 9px 18px;
