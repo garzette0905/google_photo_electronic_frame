@@ -271,6 +271,14 @@ body.has-title .demo-badge { top: 50px; }
   background: rgba(0, 0, 0, 0.6); color: #fff; font-size: 8px; line-height: 16px; text-align: center;
   padding-left: 1px; pointer-events: none;
 }
+/* 동영상 썸네일(정지 프레임) 로드 실패 시: 브라우저의 기본 "깨진 이미지" 아이콘 대신
+   빈 박스 + 재생 배지만 보이도록 이미지를 감춘다(레이아웃 공간은 유지). */
+.thumb-cell.thumb-error { background: linear-gradient(135deg, rgba(255,255,255,0.10), rgba(255,255,255,0.03)); border-radius: 7px; }
+.thumb-cell.thumb-error img { visibility: hidden; }
+.thumb-cell.thumb-error .vid-badge {
+  left: 50%; bottom: 50%; transform: translate(-50%, 50%);
+  width: 26px; height: 26px; font-size: 12px; line-height: 26px; padding-left: 2px;
+}
 
 /* ---------- 사용자 등록 안내 팝업 ---------- */
 .modal-overlay {
@@ -304,6 +312,8 @@ body.has-title .demo-badge { top: 50px; }
 .share-copied { font-size: 12px; color: #7fdda0; margin: 0 0 8px; }
 .share-modal-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 6px; }
 .modal-card .btn-primary { display: block; width: 100%; margin-top: 6px; }
+.revoke-btn { width: 100%; margin-top: 10px; background: rgba(224, 91, 91, 0.14); color: #e05b5b; }
+.revoke-btn:hover { background: rgba(224, 91, 91, 0.24); }
 
 /* ---------- 모바일 (세로 스택 + 스크롤 허용) ---------- */
 @media (max-width: 768px) {

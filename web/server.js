@@ -20,6 +20,7 @@ const express = require('express');
 const session = require('express-session');
 const FileStore = require('session-file-store')(session);
 const QRCode = require('qrcode');
+const multer = require('multer');
 
 const PORT = process.env.PORT || 3000;
 const BASE_URL = process.env.BASE_URL || `http://localhost:${PORT}`;
@@ -335,6 +336,16 @@ app.get(
 // 로그인한 사용자가 현재 고른 사진을 서버에 실제 파일로 내려받아 저장하고,
 // 로그인 없이 볼 수 있는 공개 링크(/f/<id>)를 만든다. 같은 사용자는 같은 id를
 // 재사용하므로("실시간 공유링크"), 사진을 다시 골라 다시 만들면 같은 링크에 최신 사진이 반영된다.
+//
+// 링크는 생성 시점으로부터 SHARE_TTL_HOURS(기본 24시간) 뒤 자동 만료된다. 만료된 폴더는
+// /f/:id 접근 시 즉시 지워지고, 그 외에도 주기적으로(cleanupExpiredShares) 정리된다.
+
+const SHARE_TTL_MS = Math.max(1, Number(process.env.SHARE_TTL_HOURS) || 24) * 60 * 60 * 1000;
+const MAX_SHARE_ITEMS = 60;
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 25 * 1024 * 1024, files: MAX_SHARE_ITEMS },
+});
 
 function baseUrlFromImgPath(imgPath) {
   // fullUrl 예: "/img?u=<encoded baseUrl>&sz=w1920-h1080" → baseUrl 추출
@@ -353,6 +364,50 @@ async function downloadImage(baseUrl, sz, token) {
   return Buffer.from(await r.arrayBuffer());
 }
 
+function shareDir(id) {
+  return path.join(SHARES_DIR, id);
+}
+
+function writeShareManifest(id, data) {
+  fs.writeFileSync(
+    path.join(shareDir(id), 'photos.json'),
+    JSON.stringify(
+      { ...data, updatedAt: new Date().toISOString(), expiresAt: new Date(Date.now() + SHARE_TTL_MS).toISOString() },
+      null,
+      2
+    )
+  );
+}
+
+function readShareManifest(id) {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(shareDir(id), 'photos.json'), 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+function isShareExpired(manifest) {
+  return !manifest.expiresAt || Date.now() > new Date(manifest.expiresAt).getTime();
+}
+
+function deleteShareDir(id) {
+  if (!/^[\w-]{6,}$/.test(id || '')) return;
+  fs.rmSync(shareDir(id), { recursive: true, force: true });
+}
+
+// 서버 시작 시 + 매시간 만료된 공유 폴더를 정리한다 (링크를 다시 열어보지 않아도 정리됨).
+function cleanupExpiredShares() {
+  let ids;
+  try { ids = fs.readdirSync(SHARES_DIR); } catch { return; }
+  for (const id of ids) {
+    const manifest = readShareManifest(id);
+    if (manifest && isShareExpired(manifest)) deleteShareDir(id);
+  }
+}
+cleanupExpiredShares();
+setInterval(cleanupExpiredShares, 60 * 60 * 1000);
+
 app.post(
   '/api/share',
   requireLogin(async (req, res, token) => {
@@ -368,7 +423,7 @@ app.post(
     if (!req.session.shareId) req.session.shareId = crypto.randomBytes(9).toString('base64url');
     const shareId = req.session.shareId;
 
-    const dir = path.join(SHARES_DIR, shareId);
+    const dir = shareDir(shareId);
     fs.rmSync(dir, { recursive: true, force: true }); // 이전 내용 제거 후 최신본으로 교체
     fs.mkdirSync(path.join(dir, 'photos'), { recursive: true });
 
@@ -394,20 +449,81 @@ app.post(
     if (!manifestItems.length) return res.status(500).json({ error: '사진을 저장하지 못했습니다. 다시 시도해주세요.' });
 
     manifestItems.sort((a, b) => new Date(a.createTime) - new Date(b.createTime));
-    fs.writeFileSync(
-      path.join(dir, 'photos.json'),
-      JSON.stringify({ musicUrl, title, intervalSec, effect, items: manifestItems, updatedAt: new Date().toISOString() }, null, 2)
-    );
+    writeShareManifest(shareId, { musicUrl, title, intervalSec, effect, items: manifestItems });
     res.json({ url: `${BASE_URL}/f/${shareId}`, count: manifestItems.length });
   })
 );
 
+// 구글 계정 로그인 없이도(예: 구글 포토 "공유"로 받은 사진을 보는 화면) 브라우저가 이미
+// 들고 있는 파일(blob)을 그대로 올려 같은 방식의 공유 링크를 만든다. 동영상은 공유 링크가
+// 정지 이미지만 지원하므로 위 /api/share와 동일하게 사진만 저장한다.
+app.post('/api/share/blob', upload.array('files', MAX_SHARE_ITEMS), (req, res) => {
+  try {
+    const files = req.files || [];
+    if (!files.length) return res.status(400).json({ error: '공유할 사진이 없습니다.' });
+    let meta = [];
+    try { meta = JSON.parse(req.body.meta || '[]'); } catch { /* 형식 오류면 빈 메타로 진행 */ }
+    const musicUrl = typeof req.body.musicUrl === 'string' ? req.body.musicUrl : '';
+    const title = typeof req.body.title === 'string' ? req.body.title.slice(0, 40) : '';
+    const intervalSec = Math.min(60, Math.max(3, Number(req.body.intervalSec) || 10));
+    const effect = ['fade', 'slide', 'kenburns'].includes(req.body.effect) ? req.body.effect : 'fade';
+
+    if (!req.session.shareId) req.session.shareId = crypto.randomBytes(9).toString('base64url');
+    const shareId = req.session.shareId;
+
+    const dir = shareDir(shareId);
+    fs.rmSync(dir, { recursive: true, force: true });
+    fs.mkdirSync(path.join(dir, 'photos'), { recursive: true });
+
+    const manifestItems = [];
+    files.forEach((f, i) => {
+      if (!/^image\//.test(f.mimetype || '')) return; // 사진만 지원 (동영상 제외)
+      const m = meta[i] || {};
+      const n = String(i + 1).padStart(3, '0');
+      const ext = f.mimetype === 'image/png' ? 'png' : 'jpg';
+      fs.writeFileSync(path.join(dir, 'photos', `${n}_full.${ext}`), f.buffer);
+      manifestItems.push({
+        id: `blob-${i}`,
+        createTime: m.createTime || new Date().toISOString(),
+        width: m.width || null, height: m.height || null,
+        fullUrl: `/shares/${shareId}/photos/${n}_full.${ext}`,
+        thumbUrl: `/shares/${shareId}/photos/${n}_full.${ext}`,
+      });
+    });
+    if (!manifestItems.length) {
+      return res.status(500).json({ error: '사진을 저장하지 못했습니다. (동영상은 공유 링크에 포함되지 않습니다)' });
+    }
+
+    manifestItems.sort((a, b) => new Date(a.createTime) - new Date(b.createTime));
+    writeShareManifest(shareId, { musicUrl, title, intervalSec, effect, items: manifestItems });
+    res.json({ url: `${BASE_URL}/f/${shareId}`, count: manifestItems.length });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 공유 링크 즉시 폐기: 이 브라우저 세션이 만든 링크를 지금 지운다. 로그인 여부와
+// 무관하게(게스트가 만든 링크도 있으므로) 세션에 저장된 shareId만으로 동작한다.
+app.delete('/api/share', (req, res) => {
+  const id = req.session.shareId;
+  if (id) {
+    deleteShareDir(id);
+    req.session.shareId = null;
+  }
+  res.json({ ok: true });
+});
+
 // 공개 보기 페이지 (로그인 불필요)
 app.get('/f/:id', (req, res) => {
   if (!/^[\w-]{6,}$/.test(req.params.id)) return res.status(404).send('잘못된 링크입니다.');
-  const manifest = path.join(SHARES_DIR, req.params.id, 'photos.json');
-  if (!fs.existsSync(manifest)) {
+  const manifest = readShareManifest(req.params.id);
+  if (!manifest) {
     return res.status(404).send('공유 사진을 찾을 수 없습니다. 링크가 만료되었거나 삭제되었을 수 있습니다.');
+  }
+  if (isShareExpired(manifest)) {
+    deleteShareDir(req.params.id);
+    return res.status(404).send('링크가 만료되었습니다. 공유한 분에게 새 링크를 요청해주세요.');
   }
   res.sendFile(path.join(__dirname, 'public', 'share.html'));
 });

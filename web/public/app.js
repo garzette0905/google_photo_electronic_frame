@@ -190,6 +190,15 @@ function renderPhotoList() {
     const img = document.createElement('img');
     img.src = p.thumbUrl;
     img.title = formatDate(p.createTime).main;
+    if (p.type === 'video') {
+      // 동영상 썸네일(정지 프레임) 요청이 간헐적으로 실패하면 깨진 이미지 아이콘이 보이므로,
+      // 한 번은 원본 크기 이미지로 재시도하고, 그래도 실패하면 깨진 아이콘 대신 재생 배지만
+      // 보이는 빈 박스로 대체한다.
+      img.onerror = () => {
+        if (!img.dataset.retried) { img.dataset.retried = '1'; img.src = p.fullUrl; return; }
+        cell.classList.add('thumb-error');
+      };
+    }
     cell.appendChild(img);
     if (p.type === 'video') {
       const badge = document.createElement('span');
@@ -506,7 +515,10 @@ async function loadBgMusic(url) {
           onReady: (e) => { e.target.playVideo(); resolve(); },
           onStateChange: (e) => {
             // 재생/일시정지 버튼을 하나로 통합: 재생 중이면 일시정지, 아니면 재생하기
-            if (e.data === YT.PlayerState.PLAYING) { playBtn.textContent = '⏸'; musicPlaying = true; }
+            if (e.data === YT.PlayerState.PLAYING) {
+              playBtn.textContent = '⏸'; musicPlaying = true;
+              muteVideoForBackgroundMusic();
+            }
             else if (e.data === YT.PlayerState.PAUSED) { playBtn.textContent = '▶'; musicPlaying = false; }
             refreshCaption();
           },
@@ -558,17 +570,37 @@ document.getElementById('btn-make-share').addEventListener('click', async () => 
   btn.textContent = '사진 저장 중... (사진이 많으면 시간이 걸립니다)';
   try {
     const musicUrl = document.getElementById('music-url').value.trim();
-    const items = sharePhotos.map((p) => ({
-      id: p.id, createTime: p.createTime, width: p.width, height: p.height, fullUrl: p.fullUrl,
-    }));
     // 공유 링크를 만드는 시점의 제목·전환 간격·전환 효과를 함께 저장해 공유 화면에도 동일 적용.
     const title = document.getElementById('title-input').value.trim();
     const intervalSec = Math.round(slideIntervalMs / 1000);
-    const r = await api('/api/share', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ items, musicUrl, title, intervalSec, effect: slideEffect }),
-    });
+    let r;
+    if (isSharedMode) {
+      // 구글 포토 "공유"로 받은 사진은 구글 서버 baseUrl이 없고, 이 브라우저가 이미
+      // 파일(blob)을 들고 있다. 구글에서 다시 받아오는 대신 그 파일을 그대로 올린다.
+      const form = new FormData();
+      const meta = [];
+      for (const p of sharePhotos) {
+        const blob = await fetch(p.fullUrl).then((res) => res.blob());
+        const ext = blob.type === 'image/png' ? 'png' : 'jpg';
+        form.append('files', blob, `${p.id}.${ext}`);
+        meta.push({ createTime: p.createTime, width: p.width, height: p.height });
+      }
+      form.append('meta', JSON.stringify(meta));
+      form.append('musicUrl', musicUrl);
+      form.append('title', title);
+      form.append('intervalSec', String(intervalSec));
+      form.append('effect', slideEffect);
+      r = await api('/api/share/blob', { method: 'POST', body: form });
+    } else {
+      const items = sharePhotos.map((p) => ({
+        id: p.id, createTime: p.createTime, width: p.width, height: p.height, fullUrl: p.fullUrl,
+      }));
+      r = await api('/api/share', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items, musicUrl, title, intervalSec, effect: slideEffect }),
+      });
+    }
     document.getElementById('share-url').value = r.url;
     document.getElementById('btn-open-share').href = r.url;
     document.getElementById('share-copied').classList.add('hidden');
@@ -595,6 +627,21 @@ document.getElementById('btn-share-close').addEventListener('click', (e) => {
   e.preventDefault(); shareModal.classList.add('hidden');
 });
 shareModal.addEventListener('click', (e) => { if (e.target === shareModal) shareModal.classList.add('hidden'); });
+
+document.getElementById('btn-revoke-share').addEventListener('click', async () => {
+  if (!confirm('공유 링크를 지금 폐기할까요? 이후 이 링크로는 접속할 수 없습니다.')) return;
+  const btn = document.getElementById('btn-revoke-share');
+  btn.disabled = true;
+  try {
+    await api('/api/share', { method: 'DELETE' });
+    shareModal.classList.add('hidden');
+    showToast('공유 링크를 폐기했습니다.');
+  } catch (err) {
+    showToast('폐기 실패: ' + err.message);
+  } finally {
+    btn.disabled = false;
+  }
+});
 
 // ---------- 하단 링크 ----------
 document.getElementById('btn-reselect').addEventListener('click', (e) => {
@@ -718,6 +765,14 @@ function resumeMusicAfterVideo() {
     try { ytPlayer.playVideo(); } catch {}
   }
   musicPausedForVideo = false;
+}
+
+// 배경음악이 재생되기 시작하면 배경음악과 겹쳐 들리지 않도록, 현재 재생 중인 동영상의
+// 소리를 끈다. "동영상 소리 재생" 체크를 사용자가 직접 해제한 것과 동일하게 처리한다.
+function muteVideoForBackgroundMusic() {
+  if (!videoSoundOn) return;
+  document.getElementById('video-sound-toggle').checked = false;
+  applyVideoSound(false);
 }
 
 function applyVideoSound(on) {
@@ -857,8 +912,10 @@ function boot(photos) {
   document.getElementById('demo-badge').classList.toggle('hidden', !isDemoMode);
   document.getElementById('account-links').classList.toggle('hidden', guest);
   document.getElementById('demo-links').classList.toggle('hidden', !guest);
-  // 공유 링크·사진 재선택 등은 로그인 사용자만 (게스트는 토큰이 없어 불가)
-  document.getElementById('share-block').classList.toggle('hidden', guest);
+  // 사진 재선택 등은 로그인 사용자만 가능(게스트는 토큰이 없어 불가)하지만, 실시간 공유
+  // 링크는 구글 포토 "공유"로 받은 사진(isSharedMode)의 경우 브라우저가 이미 파일을 들고
+  // 있어 로그인 없이도 만들 수 있다(/api/share/blob). 샘플 데모 사진만 제외.
+  document.getElementById('share-block').classList.toggle('hidden', isDemoMode);
   loadDisplaySettings();
   withSplash(() => { showSlideshow(); recomputeFiltered(); });
 }
